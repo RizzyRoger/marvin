@@ -1,0 +1,1 @@
+Now, go back through all the prompts I've sent you. Check the features line by line, and for each feature, ensure that it is in the software. If it is not, build it. If features conflict, prefer more recent prompts. Start at the most recent and work your way backwards. DO NOT ADD FEATURES BACK IN THAT WERE INTENTIONALLY MODIFIED OR TAKEN OUT.

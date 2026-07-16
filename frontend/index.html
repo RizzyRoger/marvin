@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marvin</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <img src="/brand-logo.png" alt="Marvin logo" />
+        </div>
+        <div>
+          <h1>Marvin</h1>
+          <p class="subtitle">Personal Agent</p>
+        </div>
+      </div>
+
+      <nav class="functions" id="functions-list"></nav>
+
+      <div class="sidebar-footer">
+        <div class="status-pill" id="model-status">
+          <span class="dot"></span>
+          <span>Loading models…</span>
+        </div>
+        <div class="voice-lock-pill" id="voice-lock-pill">Voice lock: off</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="active-function-label">Chat</h2>
+          <span class="mode-badge" id="voice-badge">Voice off</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" id="clear-btn" title="Clear chat">Clear</button>
+          <button class="btn btn-primary" id="voice-btn">Start Voice</button>
+        </div>
+      </header>
+
+      <section class="enroll-panel" id="enroll-panel" hidden>
+        <h3>Voice Lock enrollment</h3>
+        <p id="enroll-instructions">
+          Stop Voice first. Record three short clips of only your voice in a quiet room.
+          Read each phrase in your normal speaking voice.
+        </p>
+        <ol class="enroll-phrases" id="enroll-phrases"></ol>
+        <p class="enroll-progress" id="enroll-progress">Samples: 0 / 3</p>
+        <div class="enroll-actions">
+          <button class="btn btn-primary" id="enroll-record-btn">Record sample</button>
+          <button class="btn btn-ghost" id="enroll-save-btn" disabled>Save voice profile</button>
+          <button class="btn btn-ghost" id="enroll-reset-btn">Reset samples</button>
+          <button class="btn btn-ghost" id="enroll-clear-btn">Clear saved profile</button>
+        </div>
+      </section>
+
+      <section class="chat" id="chat-messages">
+        <div class="welcome">
+          <h3>Hello, I'm Marvin.</h3>
+          <p>Press <strong>Start Voice</strong> and speak, or type a message below.</p>
+          <p class="hint">Open Voice Lock in the sidebar to teach Marvin your voice.</p>
+        </div>
+      </section>
+
+      <footer class="composer">
+        <input
+          type="text"
+          id="message-input"
+          placeholder="Type a message…"
+          autocomplete="off"
+        />
+        <button class="btn btn-send" id="send-btn">Send</button>
+      </footer>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

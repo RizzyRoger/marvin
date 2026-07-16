@@ -1,0 +1,12 @@
+.venv/
+models/
+data/
+Marvin.app/
+__pycache__/
+*.py[cod]
+*.log
+*.npz
+.env
+.env.*
+.DS_Store
+.pytest_cache/
