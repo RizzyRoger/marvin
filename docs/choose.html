@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Get Marvin — choose how</title>
+    <meta
+      name="description"
+      content="Support Marvin with $5, or download free if you cannot afford it."
+    />
+    <link rel="icon" type="image/png" href="brand-logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="config.js" defer></script>
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="grain"></div>
+    </div>
+
+    <main class="page">
+      <p class="back-link"><a href="index.html">← Marvin</a></p>
+
+      <p class="brand">
+        <a href="index.html">
+          <img class="brand-mark" src="brand-logo.png" alt="" width="48" height="48" />
+          <span class="brand-name">Marvin</span>
+        </a>
+      </p>
+
+      <h1 class="headline">How would you like to get Marvin?</h1>
+
+      <p class="lede">
+        Five dollars keeps the lights on. If that is not possible right now, that
+        is okay — you can still download.
+      </p>
+
+      <div class="choice-grid">
+        <a
+          class="btn btn-primary choice"
+          id="buy-link"
+          href="#"
+          data-role="payment"
+        >
+          <span class="choice-label">Buy for $5</span>
+          <span class="choice-hint">Pay once · then download</span>
+        </a>
+        <a class="btn btn-secondary choice" href="confirm.html">
+          <span class="choice-label">I can't afford $5</span>
+          <span class="choice-hint">Continue without paying</span>
+        </a>
+      </div>
+
+      <p class="cta-note">Secure checkout via Stripe</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Are you sure? — Marvin</title>
+    <meta
+      name="description"
+      content="Confirm whether you can support Marvin with $5 or need the free download."
+    />
+    <link rel="icon" type="image/png" href="brand-logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="config.js" defer></script>
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="grain"></div>
+    </div>
+
+    <main class="page">
+      <p class="back-link"><a href="choose.html">← Back</a></p>
+
+      <p class="brand">
+        <a href="index.html">
+          <img class="brand-mark" src="brand-logo.png" alt="" width="48" height="48" />
+          <span class="brand-name">Marvin</span>
+        </a>
+      </p>
+
+      <h1 class="headline">Are you sure?</h1>
+
+      <p class="lede">
+        If you can spare five dollars, it helps keep Marvin going. If you truly
+        cannot, take the free download — no judgment.
+      </p>
+
+      <div class="choice-grid">
+        <a
+          class="btn btn-primary choice"
+          id="buy-link"
+          href="#"
+          data-role="payment"
+        >
+          <span class="choice-label">I can afford $5</span>
+          <span class="choice-hint">Go to payment</span>
+        </a>
+        <a class="btn btn-secondary choice" href="download.html">
+          <span class="choice-label">I can't</span>
+          <span class="choice-hint">Free download</span>
+        </a>
+      </div>
+    </main>
+  </body>
+</html>

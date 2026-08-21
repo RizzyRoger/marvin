@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Marvin, an AI agent that puts you in charge</title>
+    <title>Download Marvin</title>
     <meta
       name="description"
-      content="Marvin is a local voice agent for Mac. Automates what should be automated—not what can be."
+      content="Download Marvin for Mac."
     />
     <link rel="icon" type="image/png" href="brand-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,6 +16,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <script src="config.js" defer></script>
+    <script src="site.js" defer></script>
   </head>
   <body>
     <div class="atmosphere" aria-hidden="true">
@@ -24,29 +26,37 @@
       <div class="grain"></div>
     </div>
 
-    <main class="hero">
+    <main class="page">
+      <p class="back-link"><a href="index.html">← Marvin</a></p>
+
       <p class="brand">
-        <img class="brand-mark" src="brand-logo.png" alt="" width="48" height="48" />
-        <span class="brand-name">Marvin</span>
+        <a href="index.html">
+          <img class="brand-mark" src="brand-logo.png" alt="" width="48" height="48" />
+          <span class="brand-name">Marvin</span>
+        </a>
       </p>
 
-      <h1 class="headline">
-        With capabilities of ChatGPT, Claude, or Grok,
-        <em>you</em> stay in charge.
-      </h1>
+      <h1 class="headline" id="download-headline">Download Marvin</h1>
 
-      <p class="lede">
-        A local voice agent for Mac. Marvin automates what should be automated
-        not what can be automated, leaving space for you to make the decisions.
+      <p class="lede" id="download-lede">
+        Thanks for trying Marvin. Grab the current build below.
       </p>
 
       <div class="cta">
-        <a class="btn btn-primary" href="choose.html">Download now</a>
+        <a
+          class="btn btn-primary"
+          id="download-link"
+          href="https://github.com/RizzyRoger/marvin/archive/refs/heads/main.zip"
+          rel="noopener noreferrer"
+        >
+          Download for Mac
+        </a>
         <p class="cta-note">macOS desktop app · DMG releases when published</p>
       </div>
 
       <p class="privacy">
-        Local agent option — data never leaves your device. Choose privacy.
+        Runs on your machine. Mic audio and vault notes stay local unless you
+        turn on a cloud model.
       </p>
     </main>
   </body>
