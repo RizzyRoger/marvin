@@ -26,3 +26,19 @@ Open http://127.0.0.1:8080
 ## DNS
 
 See [DNS.md](DNS.md) for the exact Namecheap records.
+
+## Analytics (private)
+
+Page views use **GoatCounter** (privacy-friendly, no cookies). Revenue is **not** shown on the public site.
+
+1. Create a free site at [goatcounter.com](https://www.goatcounter.com) with code **`marvinsarl`** (must match `goatCounterCode` in `config.js`).
+2. For a combined private dashboard on your Mac:
+
+```bash
+export STRIPE_SECRET_KEY='sk_live_…'   # or sk_test_…
+# optional, for path totals in the local UI:
+# export GOATCOUNTER_API_KEY='…'
+python3 scripts/site_analytics.py
+```
+
+Open http://127.0.0.1:8765/ — bound to localhost only.

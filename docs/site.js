@@ -4,6 +4,7 @@
   var downloadUrl =
     cfg.downloadUrl ||
     "https://github.com/RizzyRoger/marvin/archive/refs/heads/main.zip";
+  var goatCode = (cfg.goatCounterCode || "").trim();
 
   document.querySelectorAll('[data-role="payment"]').forEach(function (el) {
     if (payUrl) {
@@ -32,5 +33,21 @@
       l.textContent =
         "Your payment went through. Grab the current build below.";
     }
+  }
+
+  // Lightweight privacy-friendly page views (GoatCounter). No cookies; IP not stored.
+  if (goatCode && !document.getElementById("gc-script")) {
+    window.goatcounter = { no_onload: true };
+    var s = document.createElement("script");
+    s.id = "gc-script";
+    s.async = true;
+    s.dataset.goatcounter = "https://" + goatCode + ".goatcounter.com/count";
+    s.src = "//gc.zgo.at/count.js";
+    s.onload = function () {
+      if (window.goatcounter && typeof window.goatcounter.count === "function") {
+        window.goatcounter.count();
+      }
+    };
+    document.head.appendChild(s);
   }
 })();
