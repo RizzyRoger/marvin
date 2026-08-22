@@ -1,0 +1,38 @@
+name: Assemble release DMG
+
+# After small part uploads fail on a bad local uplink, this runner
+# reassembles Marvin-*.dmg.part* assets and uploads the full DMG.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        default: v1.0.0
+      dmg_name:
+        description: Final DMG asset name
+        required: true
+        default: Marvin-1.0.0-arm64.dmg
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download part assets and assemble
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          DMG_NAME: ${{ inputs.dmg_name }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" -R "${{ github.repository }}" -p "${DMG_NAME}.part*" -D parts
+          ls -la parts
+          # Lexical order: .partaa, .partab, …
+          cat $(ls parts/${DMG_NAME}.part* | sort) > "$DMG_NAME"
+          ls -lh "$DMG_NAME"
+          # Replace existing full DMG if present
+          gh release upload "$TAG" "$DMG_NAME" -R "${{ github.repository }}" --clobber
+          echo "Uploaded $DMG_NAME to $TAG"
