@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-23T23:56:00.000Z",
+  "title": "Design System: Marvin",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1a1812",
+        "tonalRamp": ["#1a1812", "#2e2a22", "#3d3d3a", "#5a5143", "#7a6f5c", "#a8a69e", "#d4bc8a", "#e8d4a8"]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Ink Soft",
+        "canonical": "#2e2a22",
+        "tonalRamp": ["#1a1812", "#2e2a22", "#3d3d3a", "#5a5143", "#7a6f5c", "#a8a69e", "#d4bc8a", "#e8d4a8"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Enamel Paper",
+        "canonical": "#e8d4a8",
+        "tonalRamp": ["#2a2a28", "#5a5143", "#7a6f5c", "#a8a69e", "#d4d0c6", "#d4bc8a", "#e8d4a8", "#fcfbf8"]
+      },
+      "paper-deep": {
+        "role": "neutral",
+        "displayName": "Paper Deep",
+        "canonical": "#d4bc8a",
+        "tonalRamp": ["#2a2a28", "#5a5143", "#7a6f5c", "#a8a69e", "#d4d0c6", "#d4bc8a", "#e8d4a8", "#fcfbf8"]
+      },
+      "signal": {
+        "role": "primary",
+        "displayName": "Signal Yellow",
+        "canonical": "#58f03a",
+        "tonalRamp": ["#5c4800", "#8a6c00", "#2eb018", "#e0b400", "#58f03a", "#7aff5c", "#ffe566", "#fff3b0"]
+      },
+      "signal-hover": {
+        "role": "primary",
+        "displayName": "Signal Hover",
+        "canonical": "#7aff5c",
+        "tonalRamp": ["#5c4800", "#8a6c00", "#2eb018", "#e0b400", "#58f03a", "#7aff5c", "#ffe566", "#fff3b0"]
+      },
+      "signal-soft": {
+        "role": "primary",
+        "displayName": "Signal Soft",
+        "canonical": "#2eb018",
+        "tonalRamp": ["#5c4800", "#8a6c00", "#2eb018", "#e0b400", "#58f03a", "#7aff5c", "#ffe566", "#fff3b0"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#5a5143",
+        "tonalRamp": ["#1a1812", "#2e2a22", "#3d3d3a", "#5a5143", "#7a6f5c", "#a8a69e", "#d4bc8a", "#e8d4a8"]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint Ink",
+        "canonical": "#7a6f5c",
+        "tonalRamp": ["#1a1812", "#2e2a22", "#3d3d3a", "#5a5143", "#7a6f5c", "#a8a69e", "#d4bc8a", "#e8d4a8"]
+      },
+      "surface-white": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "#f5edd8",
+        "tonalRamp": ["#d4bc8a", "#f0eeea", "#f5f3ef", "#e8d4a8", "#faf9f6", "#fcfbf8", "#fefefe", "#f5edd8"]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Danger",
+        "canonical": "#b53a2e",
+        "tonalRamp": ["#4a1010", "#6e1818", "#b53a2e", "#c23a3a", "#e05555", "#ea8888", "#f2b8b8", "#fae0e0"]
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Soft Line",
+        "canonical": "rgba(26, 24, 18, 0.2)",
+        "tonalRamp": ["#1a1812", "#2e2a22", "#5a5143", "#7a6f5c", "#a8a69e", "#d4d0c6", "#d4bc8a", "#e8d4a8"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display / Directives",
+        "purpose": "Stacked uppercase enamel claims on marketing heroes."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Interior marketing page titles in Archivo Black."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Brand wordmark and app section titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Ledes, privacy copy, and chat message text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase micro labels for notes, status, and nav."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 18px 48px rgba(25, 28, 25, 0.28)",
+        "purpose": "Transient dialog/menu elevation only — not resting chrome."
+      }
+    ],
+    "motion": [
+      {
+        "name": "board-in",
+        "value": "0.7s cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Staggered plate entrance on marketing surfaces."
+      },
+      {
+        "name": "control",
+        "value": "0.15s ease",
+        "purpose": "Button fill/color and light lift transitions."
+      },
+      {
+        "name": "status-pulse",
+        "value": "1.2s infinite",
+        "purpose": "Listening/speaking status dot pulse."
+      }
+    ],
+    "breakpoints": [
+      { "name": "marketing-narrow", "value": "520px" },
+      { "name": "settings-stack", "value": "820px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Signal enamel CTA — Download, Start Voice, Send.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Download now</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; padding: 0.9rem 1.35rem; font-family: Archivo, \"Avenir Next\", \"Segoe UI\", sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.02em; color: #1a1812; background: #58f03a; border: 1.5px solid #1a1812; border-radius: 0; cursor: pointer; transition: background 0.15s ease, transform 0.15s ease; } .ds-btn-primary:hover { background: #7aff5c; transform: translateY(-1px); } .ds-btn-primary:active { transform: translateY(0); } .ds-btn-primary:focus-visible { outline: 2px solid #58f03a; outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Paper enamel alternate choice plate.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Can't afford it</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; padding: 0.9rem 1.35rem; font-family: Archivo, \"Avenir Next\", \"Segoe UI\", sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.02em; color: #1a1812; background: #e8d4a8; border: 1.5px solid #1a1812; border-radius: 0; cursor: pointer; transition: background 0.15s ease, transform 0.15s ease; } .ds-btn-secondary:hover { background: #d4bc8a; transform: translateY(-1px); } .ds-btn-secondary:focus-visible { outline: 2px solid #58f03a; outline-offset: 3px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "App chrome secondary action without fill.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Clear</button>",
+      "css": ".ds-btn-ghost { font-family: Archivo, \"Avenir Next\", \"Segoe UI\", sans-serif; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.02em; padding: 0.55rem 1rem; color: #5a5143; background: transparent; border: 1.5px solid #1a1812; border-radius: 0; cursor: pointer; transition: background 0.15s, color 0.15s; } .ds-btn-ghost:hover { background: #f5edd8; color: #1a1812; } .ds-btn-ghost:focus-visible { outline: 2px solid #58f03a; outline-offset: 3px; }"
+    },
+    {
+      "name": "Signal Bar",
+      "kind": "custom",
+      "refersTo": "signal-bar",
+      "description": "One green enamel stripe per marketing plate.",
+      "html": "<div class=\"ds-signal-bar\" aria-hidden=\"true\"></div>",
+      "css": ".ds-signal-bar { width: min(100%, 22rem); height: 0.55rem; background: #58f03a; border: 1.5px solid #1a1812; border-radius: 0; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Square ink-framed model/status chip with signal ready dot.",
+      "html": "<div class=\"ds-status-pill ready\"><span class=\"ds-dot\"></span>Ready</div>",
+      "css": ".ds-status-pill { display: inline-flex; align-items: center; gap: 0.5rem; font-family: Archivo, \"Avenir Next\", \"Segoe UI\", sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #1a1812; padding: 0.55rem 0.7rem; background: #e8d4a8; border: 1.5px solid #1a1812; border-radius: 0; } .ds-dot { width: 8px; height: 8px; border-radius: 0; background: #7a6f5c; } .ds-status-pill.ready .ds-dot { background: #58f03a; }"
+    },
+    {
+      "name": "Composer Input",
+      "kind": "input",
+      "refersTo": "input-composer",
+      "description": "Square paper field; focus border shifts to signal.",
+      "html": "<textarea class=\"ds-input-composer\" rows=\"2\" placeholder=\"Type a message…\"></textarea>",
+      "css": ".ds-input-composer { width: 100%; min-height: 2.75rem; background: #f5edd8; border: 1px solid #1a1812; border-radius: 0; padding: 0.75rem 1rem; color: #1a1812; font-family: Archivo, \"Avenir Next\", \"Segoe UI\", sans-serif; font-size: 0.9rem; line-height: 1.35; resize: none; } .ds-input-composer::placeholder { color: #7a6f5c; } .ds-input-composer:focus { outline: none; border-color: #58f03a; } .ds-input-composer:focus-visible { outline: 2px solid #58f03a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Brand Mark",
+      "kind": "nav",
+      "refersTo": "brand-mark",
+      "description": "Square ink-framed mark beside Archivo Black wordmark.",
+      "html": "<div class=\"ds-brand\"><span class=\"ds-brand-mark\" aria-hidden=\"true\"></span><span class=\"ds-brand-name\">Marvin</span></div>",
+      "css": ".ds-brand { display: inline-flex; align-items: center; gap: 0.65rem; color: #1a1812; } .ds-brand-mark { width: 2.5rem; height: 2.5rem; border: 1.5px solid #1a1812; border-radius: 0; background: #d4bc8a; } .ds-brand-name { font-family: \"Archivo Black\", \"Arial Black\", Impact, sans-serif; font-size: 1.15rem; font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1; }"
+    },
+    {
+      "name": "Stacked Directives",
+      "kind": "custom",
+      "refersTo": "display",
+      "description": "Hero enamel claims with optional signal underline on the last line.",
+      "html": "<ul class=\"ds-directives\" aria-label=\"Marvin\"><li>Marvin</li><li>Local voice</li><li class=\"ds-signal-line\">You in charge</li></ul>",
+      "css": ".ds-directives { margin: 0; padding: 0; list-style: none; } .ds-directives li { font-family: \"Archivo Black\", \"Arial Black\", Impact, sans-serif; font-size: clamp(2.35rem, 8vw, 4.75rem); line-height: 0.92; letter-spacing: -0.02em; text-transform: uppercase; color: #1a1812; white-space: nowrap; } .ds-directives li + li { margin-top: 0.12em; } .ds-signal-line { position: relative; display: inline-block; } .ds-signal-line::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 0.06em; height: 0.18em; background: #58f03a; z-index: -1; }"
+    },
+    {
+      "name": "Mode Badge",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Square mode chip; fills green signal only when voice is live.",
+      "html": "<span class=\"ds-mode-badge active\">Voice</span>",
+      "css": ".ds-mode-badge { display: inline-block; font-family: Archivo, \"Avenir Next\", \"Segoe UI\", sans-serif; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.55rem; border-radius: 0; background: transparent; color: #5a5143; border: 1.5px solid #1a1812; } .ds-mode-badge.active { background: #58f03a; color: #1a1812; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Signal Board",
+    "overview": "Marvin reads as Swiss industrial enamel signage: stacked uppercase directives on quiet paper, thick ink rules, and a single yellow signal used like a CRT caution stripe — not a soft AI glow. Clarity is the personality. The marketing site boards the claim (local voice, you in charge); the app operates the same materials with yellow reserved for live voice and status.\n\nDensity is sparse and frontal. Surfaces are matte paper fields with a whisper of enamel grain; no orbs, no purple haze, no floating glass. Depth comes from ink borders and tonal paper steps, not shadows on primary chrome.\n\n(Shipped Signal Board supersedes the older cream/sage/Fraunces note still lingering in PRODUCT.md brand history.)",
+    "keyCharacteristics": [
+      "Paper field #e8d4a8 + near-black ink #1a1812 + one signal yellow #58f03a",
+      "Archivo Black for directives; Archivo for body and UI chrome",
+      "Square enamel edges (border-radius: 0) on primary chrome",
+      "Thick ink rules (1.5px–2px) for section cuts and frames",
+      "Yellow used sparingly: one bar, primary CTAs, live-voice accents"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Signal yellow occupies a small fraction of any screen. One bar or one live-voice control cluster is enough; flooding yellow kills the stripe.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink-On-Paper Rule",
+        "body": "Figure and rule are ink on paper (or paper on ink in dark theme). Never swap signal yellow into body text or large backgrounds.",
+        "section": "colors"
+      },
+      {
+        "name": "The Stacked Directive Rule",
+        "body": "Hero claims stack as short uppercase enamel lines, not a long sentence headline. Keep lines board-short; do not wrap into paragraph display.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Soft Serif Rule",
+        "body": "Do not introduce Fraunces, Georgia, or other editorial display faces into this world.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Enamel Rule",
+        "body": "Buttons, pills, badges, brand marks, signal bars, and chat bubbles sit flush. Do not add ambient drop shadows to resting chrome.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Square Edge Rule",
+        "body": "Primary interactive chrome is square. Soft radii belong only to incidental overlay chrome until those surfaces are brought into enamel; do not treat soft cards as the house shape.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do keep signal yellow rare — bar, primary CTA, or live-voice state.",
+      "Do stack short uppercase Archivo Black directives for hero claims.",
+      "Do use square edges and 1.5–2px ink rules on primary chrome.",
+      "Do set body/lede on muted ink over paper, not black slabs of yellow.",
+      "Do honor prefers-reduced-motion by dropping board-in and hover lift."
+    ],
+    "donts": [
+      "Don't build soft AI heroes, purple gradients, glow orbs, or glassmorphism on resting surfaces.",
+      "Don't round primary buttons, pills, badges, or the signal bar.",
+      "Don't use yellow as a page wash or for long-form text.",
+      "Don't revive Fraunces/Sora/sage as the marketing system — Signal Board is the shipped world.",
+      "Don't invent kickers/eyebrows above the brand; the brand and directives are the board."
+    ]
+  }
+}

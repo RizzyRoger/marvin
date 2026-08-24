@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
@@ -20,11 +20,15 @@
     <script src="site.js" defer></script>
   </head>
   <body>
-    <div class="atmosphere" aria-hidden="true">
-      <div class="orb orb-a"></div>
-      <div class="orb orb-b"></div>
-      <div class="grain"></div>
-    </div>
+    <!--
+      THESIS: Clarity as personality — stacked enamel directives, not a soft AI hero.
+      OWN-WORLD: Paper #e8d4a8, ink #1a1812, signal green #58f03a; Archivo Black + Archivo; square enamel edges; one green bar.
+      STORY: Visitor understands Marvin is a local Mac voice agent they control, then downloads.
+      FIRST VIEWPORT: Stacked MARVIN / LOCAL VOICE / YOU IN CHARGE; lede; green signal bar; Download CTA; privacy rule.
+      FORM: Signal Board (Swiss industrial signage) · seed 77a4b2bd · model-pick · retro green/tan remap.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+    -->
+    <div class="atmosphere" aria-hidden="true"></div>
 
     <main class="hero">
       <p class="brand">
@@ -32,15 +36,18 @@
         <span class="brand-name">Marvin</span>
       </p>
 
-      <h1 class="headline">
-        With capabilities of ChatGPT, Claude, or Grok,
-        <em>you</em> stay in charge.
-      </h1>
+      <ul class="directives" aria-label="Marvin">
+        <li>Marvin</li>
+        <li>Local voice</li>
+        <li class="signal-line">You in charge</li>
+      </ul>
 
       <p class="lede">
-        A local voice agent for Mac. Marvin automates what should be automated
-        not what can be automated, leaving space for you to make the decisions.
+        A local voice agent for Mac. Automates what should be automated —
+        not what can be — so the decisions stay yours.
       </p>
+
+      <div class="signal-bar" aria-hidden="true"></div>
 
       <div class="cta">
         <a class="btn btn-primary" href="choose.html">Download now</a>

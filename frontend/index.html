@@ -4,6 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Marvin</title>
+  <!--
+    THESIS: Signal Board operate shell — transcript first, green signal only for live voice.
+    OWN-WORLD: Tan paper / warm ink / bright green signal · Archivo · square enamel · thick sidebar rule.
+    STORY: User talks or types; status band names Listening / Thinking / Speaking.
+    FIRST VIEWPORT: Sidebar brand + functions · main transcript · green Start Voice.
+    FORM: Signal Board · seed 77a4b2bd · model-pick · retro green/tan remap.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+  -->
+  <script>
+    (() => {
+      const pref = localStorage.getItem("marvin-theme") || "light";
+      document.documentElement.dataset.theme =
+        pref === "dark" || pref === "light"
+          ? pref
+          : matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
@@ -19,64 +44,607 @@
         </div>
       </div>
 
-      <nav class="functions" id="functions-list"></nav>
+      <p class="functions-heading">Functions used</p>
+      <div class="functions" id="functions-list"></div>
 
       <div class="sidebar-footer">
         <div class="status-pill" id="model-status">
           <span class="dot"></span>
           <span>Loading models…</span>
         </div>
-        <div class="voice-lock-pill" id="voice-lock-pill">Voice lock: off</div>
+        <div class="footer-controls">
+          <button
+            class="settings-btn"
+            id="settings-btn"
+            title="Open settings"
+            aria-label="Open settings"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 8.25A3.75 3.75 0 1 0 12 15.75 3.75 3.75 0 0 0 12 8.25Z" />
+              <path d="M19.1 13.4a7.7 7.7 0 0 0 0-2.8l2-1.55-2-3.46-2.48 1a8 8 0 0 0-2.42-1.4L13.82 2h-4l-.4 3.19A8 8 0 0 0 7 6.59l-2.47-1-2 3.46 2 1.55a7.7 7.7 0 0 0 0 2.8l-2 1.55 2 3.46 2.47-1a8 8 0 0 0 2.42 1.4l.4 3.19h4l.4-3.19a8 8 0 0 0 2.42-1.4l2.48 1 2-3.46-2.02-1.55Z" />
+            </svg>
+          </button>
+        </div>
       </div>
+
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div class="topbar-left">
-          <h2 id="active-function-label">Chat</h2>
+          <h2 id="active-function-label">Automatic routing</h2>
           <span class="mode-badge" id="voice-badge">Voice off</span>
         </div>
         <div class="topbar-actions">
-          <button class="btn btn-ghost" id="clear-btn" title="Clear chat">Clear</button>
           <button class="btn btn-primary" id="voice-btn">Start Voice</button>
         </div>
       </header>
-
-      <section class="enroll-panel" id="enroll-panel" hidden>
-        <h3>Voice Lock enrollment</h3>
-        <p id="enroll-instructions">
-          Stop Voice first. Record three short clips of only your voice in a quiet room.
-          Read each phrase in your normal speaking voice.
-        </p>
-        <ol class="enroll-phrases" id="enroll-phrases"></ol>
-        <p class="enroll-progress" id="enroll-progress">Samples: 0 / 3</p>
-        <div class="enroll-actions">
-          <button class="btn btn-primary" id="enroll-record-btn">Record sample</button>
-          <button class="btn btn-ghost" id="enroll-save-btn" disabled>Save voice profile</button>
-          <button class="btn btn-ghost" id="enroll-reset-btn">Reset samples</button>
-          <button class="btn btn-ghost" id="enroll-clear-btn">Clear saved profile</button>
-        </div>
-      </section>
 
       <section class="chat" id="chat-messages">
         <div class="welcome">
           <h3>Hello, I'm Marvin.</h3>
           <p>Press <strong>Start Voice</strong> and speak, or type a message below.</p>
-          <p class="hint">Open Voice Lock in the sidebar to teach Marvin your voice.</p>
+          <p class="hint">Configure Voice Lock in Settings → Voice Lock.</p>
         </div>
       </section>
 
       <footer class="composer">
-        <input
-          type="text"
+        <textarea
           id="message-input"
           placeholder="Type a message…"
           autocomplete="off"
-        />
-        <button class="btn btn-send" id="send-btn">Send</button>
+          rows="1"
+        ></textarea>
+        <div class="composer-actions">
+          <div class="model-menu-wrap">
+            <button
+              class="btn btn-model"
+              id="model-btn"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-label="Choose AI model"
+              title="Choose AI model"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+                <path d="M19.4 13a7.8 7.8 0 0 0 .1-2l2-1.6-2-3.4-2.4 1a7.7 7.7 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.7 7.7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.7 7.7 0 0 0 1.7 1L11 21h4l.4-2.9a7.7 7.7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z" />
+              </svg>
+            </button>
+            <div class="model-menu" id="model-menu" role="menu" hidden></div>
+          </div>
+          <button class="btn btn-send" id="send-btn">Send</button>
+        </div>
       </footer>
     </main>
   </div>
+
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-shell">
+      <header class="settings-dialog-header">
+        <h2 id="settings-title">Settings</h2>
+        <button class="icon-btn" id="settings-close-btn" aria-label="Close settings">×</button>
+      </header>
+      <div class="settings-body">
+        <nav class="settings-nav" aria-label="Settings categories" role="tablist">
+          <button
+            type="button"
+            class="settings-nav-item"
+            role="tab"
+            id="settings-tab-general"
+            data-settings-category="general"
+            aria-controls="settings-panel-general"
+            aria-selected="true"
+          >
+            General
+          </button>
+          <button
+            type="button"
+            class="settings-nav-item"
+            role="tab"
+            id="settings-tab-providers"
+            data-settings-category="providers"
+            aria-controls="settings-panel-providers"
+            aria-selected="false"
+          >
+            AI Providers
+          </button>
+          <button
+            type="button"
+            class="settings-nav-item"
+            role="tab"
+            id="settings-tab-voice"
+            data-settings-category="voice"
+            aria-controls="settings-panel-voice"
+            aria-selected="false"
+          >
+            Voice Lock
+          </button>
+          <button
+            type="button"
+            class="settings-nav-item"
+            role="tab"
+            id="settings-tab-spotify"
+            data-settings-category="spotify"
+            aria-controls="settings-panel-spotify"
+            aria-selected="false"
+          >
+            Spotify
+          </button>
+          <button
+            type="button"
+            class="settings-nav-item"
+            role="tab"
+            id="settings-tab-scrambler"
+            data-settings-category="scrambler"
+            aria-controls="settings-panel-scrambler"
+            aria-selected="false"
+          >
+            Voice Scrambler
+          </button>
+          <button
+            type="button"
+            class="settings-nav-item"
+            role="tab"
+            id="settings-tab-skills"
+            data-settings-category="skills"
+            aria-controls="settings-panel-skills"
+            aria-selected="false"
+          >
+            Skills
+          </button>
+        </nav>
+
+        <div class="settings-panels">
+          <section
+            class="settings-panel"
+            id="settings-panel-general"
+            role="tabpanel"
+            aria-labelledby="settings-tab-general"
+            data-settings-category="general"
+          >
+            <article class="settings-card">
+              <h3>Appearance</h3>
+              <p class="settings-card-desc">Choose how Marvin looks on this device.</p>
+              <div class="theme-options" role="group" aria-label="Color theme">
+                <button class="theme-option" data-theme-value="light" type="button">Light</button>
+                <button class="theme-option" data-theme-value="system" type="button">System</button>
+                <button class="theme-option" data-theme-value="dark" type="button">Dark</button>
+              </div>
+              <label class="voice-lock-field" style="margin-top: 1rem; display: block;">
+                <span class="setting-label">UI scale</span>
+                <input
+                  type="range"
+                  id="ui-scale-slider"
+                  min="90"
+                  max="130"
+                  step="5"
+                  value="100"
+                  aria-valuemin="90"
+                  aria-valuemax="130"
+                />
+                <span class="setting-description" id="ui-scale-label">100%</span>
+              </label>
+            </article>
+
+            <article class="settings-card">
+              <h3>Obsidian vault</h3>
+              <p class="settings-card-desc">
+                Folder Marvin uses for notes and daily tasks. Required when running from
+                Applications.
+              </p>
+              <label class="voice-lock-field" style="display: block;">
+                <span class="setting-label">Vault path</span>
+                <input
+                  type="text"
+                  id="vault-path-input"
+                  class="settings-text-input"
+                  placeholder="/Users/you/Documents/Obsidian Vault"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <p class="hint" id="vault-path-status" style="margin-top: 0.5rem;"></p>
+              <div class="setting-row" style="margin-top: 0.65rem; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" class="settings-action" id="vault-path-save">
+                  Save vault path
+                </button>
+                <button type="button" class="settings-action" id="vault-request-access" hidden>
+                  Request Documents access
+                </button>
+              </div>
+            </article>
+
+            <article class="settings-card">
+              <h3>Output speech</h3>
+              <p class="settings-card-desc">
+                How Marvin sounds when speaking replies aloud.
+              </p>
+              <div class="setting-row" style="gap: 0.75rem; flex-wrap: wrap;">
+                <label class="voice-lock-field">
+                  <span class="setting-label">Nationality</span>
+                  <select id="speech-nationality" class="settings-text-input">
+                    <option value="british">British</option>
+                    <option value="american">American</option>
+                  </select>
+                </label>
+                <label class="voice-lock-field">
+                  <span class="setting-label">Gender</span>
+                  <select id="speech-gender" class="settings-text-input">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </label>
+              </div>
+              <label class="voice-lock-field" style="display: block; margin-top: 0.75rem;">
+                <span class="setting-label">When to speak</span>
+                <select id="speech-mode" class="settings-text-input">
+                  <option value="always_on">Always on</option>
+                  <option value="voice_input_only">Only after voice input</option>
+                  <option value="always_off">Always off</option>
+                </select>
+              </label>
+              <p class="hint" id="speech-settings-status" style="margin-top: 0.5rem;"></p>
+            </article>
+
+            <article class="settings-card">
+              <h3>Privacy</h3>
+              <p class="settings-card-desc">
+                Voice audio stays on this device. Chat text is stored locally.
+                Optional cloud features send only what you enable:
+              </p>
+              <ul class="settings-card-desc" style="margin: 0.5rem 0 0; padding-left: 1.2rem;">
+                <li>Cloud LLMs (Settings → AI Providers): prompts and replies</li>
+                <li>Web Search (Tavily): search queries derived from your request</li>
+                <li>Spotify: OAuth tokens in Keychain; playback commands to Spotify</li>
+              </ul>
+              <p class="hint" style="margin-top: 0.75rem;" id="privacy-cloud-vault-warning">
+                Obsidian notes stay on disk by default. If you use a <strong>cloud</strong> model
+                while Obsidian tools are active, note text included in that turn can leave this
+                machine to the provider. Prefer local Qwen for vault-heavy work, or disconnect
+                the vault when using cloud models.
+              </p>
+            </article>
+
+            <article class="settings-card settings-card-danger">
+              <h3>Conversation</h3>
+              <p class="settings-card-desc">
+                Clear chat removes conversation history only. Provider keys, Voice Lock,
+                and other settings are kept.
+              </p>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Clear chat</span>
+                  <span class="setting-description" id="settings-clear-status">
+                    Delete every message in this conversation
+                  </span>
+                </div>
+                <button class="settings-action danger" id="settings-clear-btn" type="button">
+                  Clear chat
+                </button>
+              </div>
+            </article>
+          </section>
+
+          <section
+            class="settings-panel"
+            id="settings-panel-providers"
+            role="tabpanel"
+            aria-labelledby="settings-tab-providers"
+            data-settings-category="providers"
+            hidden
+          >
+            <p class="settings-panel-intro">
+              Prompts are sent to the selected provider. API keys stay in the system keychain
+              and are never shown again after saving.
+            </p>
+            <div class="provider-cards-grid" id="provider-cards"></div>
+          </section>
+
+          <section
+            class="settings-panel"
+            id="settings-panel-voice"
+            role="tabpanel"
+            aria-labelledby="settings-tab-voice"
+            data-settings-category="voice"
+            hidden
+          >
+            <article class="settings-card">
+              <h3>Voice Lock status</h3>
+              <p class="settings-card-desc" id="voice-lock-status-line">Not configured</p>
+              <p class="hint" id="voice-lock-microphone">Microphone: —</p>
+              <p class="hint" id="voice-lock-limitation"></p>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Enable Voice Lock</span>
+                  <span class="setting-description">Only your enrolled voice can activate Marvin</span>
+                </div>
+                <label class="theme-option voice-lock-switch">
+                  <input type="checkbox" id="voice-lock-enabled" />
+                  <span>On</span>
+                </label>
+              </div>
+              <p class="setting-description" id="settings-voice-status" hidden>Not configured</p>
+            </article>
+
+            <article class="settings-card settings-card-wide">
+              <h3>Voice enrollment</h3>
+              <p id="enroll-instructions" class="settings-card-desc">
+                Stop Voice first. Record six clips of only your voice in a quiet room.
+              </p>
+              <div class="enroll-samples" id="enroll-phrases" role="list"></div>
+              <p class="enroll-progress" id="enroll-progress">Samples: 0 / 6</p>
+              <div class="enroll-actions">
+                <button class="btn btn-primary" id="enroll-record-btn" type="button">
+                  Record next sample
+                </button>
+                <button class="btn btn-ghost" id="enroll-save-btn" type="button" disabled>
+                  Save voice profile
+                </button>
+              </div>
+            </article>
+
+            <div class="settings-card-grid">
+              <article class="settings-card">
+                <h3>Verification behavior</h3>
+                <label class="voice-lock-field">
+                  <span class="setting-label">Strictness</span>
+                  <select id="voice-lock-strictness">
+                    <option value="balanced">Balanced</option>
+                    <option value="strict" selected>Strict</option>
+                    <option value="very_strict">Very strict</option>
+                  </select>
+                </label>
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Require “Marvin”</span>
+                    <span class="setting-description">Or an active conversation follow-up</span>
+                  </div>
+                  <label class="theme-option voice-lock-switch">
+                    <input type="checkbox" id="voice-lock-require-address" checked />
+                    <span>On</span>
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Contextual follow-ups</span>
+                    <span class="setting-description">Allow short replies while focused</span>
+                  </div>
+                  <label class="theme-option voice-lock-switch">
+                    <input type="checkbox" id="voice-lock-continuation" checked />
+                    <span>On</span>
+                  </label>
+                </div>
+                <label class="voice-lock-field">
+                  <span class="setting-label">Continuation window (seconds)</span>
+                  <input type="number" id="voice-lock-window" min="30" max="120" step="5" value="60" />
+                </label>
+                <button class="btn btn-ghost" id="voice-test-btn" type="button">Test Voice Lock</button>
+                <p class="hint" id="voice-test-result" hidden></p>
+              </article>
+
+              <article class="settings-card settings-card-danger">
+                <h3>Voice-profile management</h3>
+                <p class="settings-card-desc">
+                  Destructive actions. Resetting samples does not delete a saved profile until
+                  you clear it.
+                </p>
+                <div class="enroll-actions">
+                  <button class="btn btn-ghost" id="enroll-reset-btn" type="button">
+                    Reset all samples
+                  </button>
+                  <button class="btn btn-ghost" id="enroll-clear-btn" type="button">
+                    Delete voice profile
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section
+            class="settings-panel"
+            id="settings-panel-spotify"
+            role="tabpanel"
+            aria-labelledby="settings-tab-spotify"
+            data-settings-category="spotify"
+            hidden
+          >
+            <article class="settings-card">
+              <h3>Spotify</h3>
+              <p class="settings-card-desc" id="spotify-status-line">Not connected</p>
+              <p class="hint" id="spotify-hint">
+                Connect Spotify to control playback with voice. Premium and an open Spotify
+                app on a phone or computer are required. Audio plays in Spotify, not in Marvin.
+              </p>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Account</span>
+                  <span class="setting-description" id="spotify-account-line">
+                    Tokens stay in the system keychain
+                  </span>
+                </div>
+                <div class="enroll-actions">
+                  <button class="btn btn-primary" id="spotify-connect-btn" type="button">
+                    Connect Spotify
+                  </button>
+                  <button class="btn btn-ghost" id="spotify-disconnect-btn" type="button" disabled>
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section
+            class="settings-panel"
+            id="settings-panel-scrambler"
+            role="tabpanel"
+            aria-labelledby="settings-tab-scrambler"
+            data-settings-category="scrambler"
+            hidden
+          >
+            <article class="settings-card">
+              <h3>Voice Scrambler</h3>
+              <p class="settings-card-desc" id="scrambler-status-line">Stopped</p>
+              <p class="hint" id="scrambler-hint">
+                Routes anonymized live mic audio to a virtual cable for other apps
+                (Zoom, Discord). Install BlackHole, select it below, start the scrambler,
+                then set that cable as the microphone in the other app. Not for speakers.
+                Raw audio is not saved.
+              </p>
+              <label class="voice-lock-field" style="display: block; margin-top: 0.75rem;">
+                <span class="setting-label">Output device</span>
+                <select id="scrambler-device-select" class="settings-text-input"></select>
+              </label>
+              <label class="voice-lock-field" style="display: block; margin-top: 0.85rem;">
+                <span class="setting-label">
+                  Clarity ↔ Disguise
+                  <span id="scrambler-clarity-label">65%</span>
+                </span>
+                <input
+                  type="range"
+                  id="scrambler-clarity"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="65"
+                />
+              </label>
+              <label class="voice-lock-field" style="display: block; margin-top: 0.65rem;">
+                <span class="setting-label">
+                  Scramble strength
+                  <span id="scrambler-strength-label">100%</span>
+                </span>
+                <input
+                  type="range"
+                  id="scrambler-strength"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="100"
+                />
+              </label>
+              <label class="voice-lock-field" style="display: block; margin-top: 0.65rem;">
+                <span class="setting-label">
+                  Master gain
+                  <span id="scrambler-gain-label">100%</span>
+                </span>
+                <input
+                  type="range"
+                  id="scrambler-master-gain"
+                  min="50"
+                  max="150"
+                  step="1"
+                  value="100"
+                />
+              </label>
+              <div class="enroll-actions" style="margin-top: 0.75rem;">
+                <button class="btn btn-primary" id="scrambler-start-btn" type="button">
+                  Start scrambler
+                </button>
+                <button class="btn btn-ghost" id="scrambler-stop-btn" type="button">
+                  Stop
+                </button>
+                <button class="btn btn-ghost" id="scrambler-reset-btn" type="button">
+                  Reset defaults
+                </button>
+              </div>
+            </article>
+          </section>
+
+          <section
+            class="settings-panel"
+            id="settings-panel-skills"
+            role="tabpanel"
+            aria-labelledby="settings-tab-skills"
+            data-settings-category="skills"
+            hidden
+          >
+            <article class="settings-card">
+              <h3>Skill file</h3>
+              <p class="settings-card-desc" id="skills-status-line">
+                Loading skill status…
+              </p>
+              <p class="hint" id="skills-path-line"></p>
+              <p class="settings-card-desc">
+                Edit <code>skill.md</code> to add standing instructions. Marvin loads it
+                only after you replace the placeholder text. Content is appended to the
+                local system prompt (and to cloud providers if you select one).
+              </p>
+              <div class="enroll-actions">
+                <button class="btn btn-primary" id="skills-reveal-btn" type="button">
+                  Open skills folder
+                </button>
+                <button class="btn btn-ghost" id="skills-refresh-btn" type="button">
+                  Refresh status
+                </button>
+              </div>
+            </article>
+          </section>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="vault-setup-dialog">
+    <div class="confirm-content">
+      <h2>Choose your Obsidian vault</h2>
+      <p>
+        Marvin does not auto-link a vault on first launch. Enter the folder path for your
+        Obsidian vault (or skip and set it later in Settings → General).
+      </p>
+      <label class="voice-lock-field" style="display: block; margin: 0.75rem 0;">
+        <span class="setting-label">Vault path</span>
+        <input
+          type="text"
+          id="vault-setup-input"
+          class="settings-text-input"
+          placeholder="/Users/you/Documents/Obsidian Vault"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+      <p class="hint" id="vault-setup-status"></p>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="vault-setup-skip-btn" type="button">Skip for now</button>
+        <button class="btn" id="vault-setup-save-btn" type="button">Save vault</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="clear-confirm-dialog">
+    <div class="confirm-content">
+      <h2>Clear chat history?</h2>
+      <p>This removes every message from Marvin’s chat history. This cannot be undone.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="clear-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="clear-confirm-btn">Clear chat</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="voice-clear-confirm-dialog">
+    <div class="confirm-content">
+      <h2>Delete voice profile?</h2>
+      <p>This permanently deletes your enrolled Voice Lock profile. You will need to re-enroll to use Voice Lock again.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="voice-clear-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="voice-clear-confirm-btn">Delete profile</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="enroll-reset-all-dialog">
+    <div class="confirm-content">
+      <h2>Reset all samples?</h2>
+      <p>This discards every enrollment recording in progress. Your saved voice profile is not deleted until you choose Delete voice profile.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="enroll-reset-all-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="enroll-reset-all-confirm-btn">Reset all samples</button>
+      </div>
+    </div>
+  </dialog>
 
   <script src="/static/app.js"></script>
 </body>

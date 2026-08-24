@@ -1,0 +1,78 @@
+{
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
+  },
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          "frontend/styles.css"
+        ],
+        "createdAt": "2026-08-24T00:01:08.016Z",
+        "reason": "Operate shell micro type steps; marketing ramp lives in docs CSS. Documenter left app micro sizes out of DESIGN.md on purpose."
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "*",
+        "files": [
+          "frontend/styles.css"
+        ],
+        "createdAt": "2026-08-24T00:01:08.054Z",
+        "reason": "Signal Board square edge (0) is house style; remaining soft radii are legacy defects being zeroed, not a second scale."
+      },
+      {
+        "rule": "side-tab",
+        "value": "4px solid var(--border)",
+        "createdAt": "2026-08-24T00:01:08.084Z",
+        "reason": "Signal Board thick sidebar seam is an enamel rule, not a card side-tab accent."
+      },
+      {
+        "rule": "side-tab",
+        "value": "2px solid var(--border)",
+        "createdAt": "2026-08-24T00:01:08.112Z",
+        "reason": "Signal Board ink seam variants on topbar/composer."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          "frontend/styles.css"
+        ],
+        "createdAt": "2026-08-24T00:01:23.647Z",
+        "reason": "Legacy overlay/shadow rgba and old cream leftovers in settings chrome; Signal Board palette is paper/ink/signal."
+      },
+      {
+        "rule": "design-system-font",
+        "value": "sfmono-regular",
+        "createdAt": "2026-08-24T00:01:23.673Z",
+        "reason": "Case variant of code mono face."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "frontend/styles.css"
+        ],
+        "createdAt": "2026-08-24T00:01:23.728Z",
+        "reason": "App chrome uses intentional ink seams (sidebar/topbar), not AI card side-tabs."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          "docs/styles.css"
+        ],
+        "createdAt": "2026-08-24T00:09:33.824Z",
+        "reason": "Marketing micro type steps (CTA notes, privacy, back links) sit beside DESIGN.md display/body ramp."
+      }
+    ]
+  }
+}
