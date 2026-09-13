@@ -199,12 +199,17 @@ class AgentMultiToolPathTests(unittest.TestCase):
 
         with (
             patch(
-                "backend.tools.obsidian.register_vault_capability",
+                "backend.tools.web_search.register_web_search_capability",
                 return_value=False,
             ),
             patch(
-                "backend.tools.web_search.service.register_web_search_capability",
-                return_value=False,
+                "backend.tools.web_search.decide_web_search",
+                return_value=(
+                    __import__(
+                        "backend.tools.web_search.types", fromlist=["SearchDecision"]
+                    ).SearchDecision.NOT_NEEDED,
+                    "none",
+                ),
             ),
             patch(
                 "backend.tools.spotify.register_spotify_capability",
@@ -245,22 +250,13 @@ class AgentMultiToolPathTests(unittest.TestCase):
                 "backend.tools.voice_scrambler.handle_direct_scrambler",
                 side_effect=fake_direct,
             ),
-            patch(
-                "backend.tools.obsidian.explicit_vault_intent",
-                return_value=False,
-            ),
-            patch(
-                "backend.tools.obsidian.extract_named_note_hint",
-                return_value=None,
-            ),
             patch.object(agent, "_route_function", return_value=("chat", "fast")),
-            patch.object(agent, "_maybe_auto_continue_spotify", side_effect=lambda *a, **k: (a[1], False)),
             patch.object(agent, "begin_tool", return_value="t1"),
             patch.object(agent, "finish_tool"),
         ):
-            reply, routed, side = agent._process_text_once(
+            reply = agent._process_side_effect_tools(
                 "play radiohead on spotify and scramble voice",
-                show_user=False,
+                "System",
             )
 
         self.assertIn("scrambler_direct", executed)
@@ -270,8 +266,7 @@ class AgentMultiToolPathTests(unittest.TestCase):
         # Scrambler already direct-satisfied — not required of the LLM.
         self.assertNotIn("scrambler_", kwargs.get("required_tool_prefixes") or [])
         self.assertEqual(kwargs.get("pre_satisfied_families"), ["scrambler"])
-        self.assertEqual(routed, "spotify")
-        self.assertTrue(side)
+        self.assertIn("Playing Radiohead", reply)
         self.assertIn("Radiohead", reply)
 
 

@@ -75,5 +75,33 @@ def append_message(
         return entry
 
 
+def delete_exchange(user_message_id: str) -> dict[str, Any]:
+    """Delete a user message and the immediately following assistant reply."""
+    with _history_lock:
+        messages = load_history()
+        index = next(
+            (
+                i
+                for i, item in enumerate(messages)
+                if item.get("id") == user_message_id and item.get("role") == "user"
+            ),
+            None,
+        )
+        if index is None:
+            raise KeyError(user_message_id)
+        removed = [messages[index]]
+        del messages[index]
+        if index < len(messages) and messages[index].get("role") == "assistant":
+            removed.append(messages[index])
+            del messages[index]
+        save_history(messages)
+        snapshot = list(messages)
+    return {
+        "ok": True,
+        "deleted_ids": [item.get("id") for item in removed],
+        "messages": snapshot,
+    }
+
+
 def clear_history() -> None:
     save_history([])

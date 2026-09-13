@@ -41,6 +41,12 @@ else
   echo "Models already present in Application Support."
 fi
 
+if [ -d "$ROOT/models/llm-mlx" ] && [ ! -d "$MODELS_DIR/llm-mlx" ]; then
+  echo "Copying MLX Qwen weights → Application Support…"
+  mkdir -p "$MODELS_DIR/llm-mlx"
+  rsync -a "$ROOT/models/llm-mlx/" "$MODELS_DIR/llm-mlx/"
+fi
+
 # Seed vault path preference when Documents Obsidian Vault exists.
 DEFAULT_VAULT="${HOME}/Documents/Obsidian Vault"
 PREFS="$DATA_DIR/user_prefs.json"

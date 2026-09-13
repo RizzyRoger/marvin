@@ -13,20 +13,32 @@ from typing import Callable
 import numpy as np
 import sounddevice as sd
 
+from backend.clock import get_clock_service, match_deterministic_datetime_query
 from backend.config import (
+    ENROLL_NATURAL_PROMPT,
     FUNCTION_VOICE_ALIASES,
     FUNCTIONS,
     SPEAKER_ENROLL_SECONDS,
     SPEAKER_LOCK_ENABLED,
+    SPEAKER_NATURAL_ENROLL_SECONDS,
+    SPEAKER_THRESHOLD,
     SPEAKER_VERIFY_SECONDS,
     SYSTEM_PROMPTS,
     VAD_MIN_SILENCE_MS,
     VAD_SAMPLE_RATE,
+    _TOOL_EVIDENCE_RULE,
+    enrollment_phrases,
 )
 from backend.pipeline import KokoroTTS, SileroVAD, SpeakerVerifier, WhisperSTT
 from backend.providers.session_llm import ProviderLLM
 from backend.pipeline.tones import play_listening_off, play_listening_on, play_rejected
 from backend.storage.chat import append_message, load_history
+from backend.voice_settings import (
+    VoiceListeningSettings,
+    load_voice_settings,
+    save_voice_settings,
+    update_voice_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +64,11 @@ class MarvinAgent:
     ):
         self.on_status = on_status or (lambda _s, _d: None)
         self.on_message = on_message or (lambda _message: None)
+        self.on_broadcast: Callable[[str, dict], None] = lambda _e, _d: None
         self.active_function = "chat"
         self._last_routed_function = "chat"
+        self._clock = get_clock_service()
+        self._client_timezone: str | None = None
         self._vad: SileroVAD | None = None
         self._stt: WhisperSTT | None = None
         self._llm: ProviderLLM | None = None
@@ -71,6 +86,11 @@ class MarvinAgent:
         self.used_functions: list[str] = []
         self._sticky_tools: list[str] = []
         self._active_tool_calls: dict[str, dict[str, int]] = {}
+        self._voice_settings = load_voice_settings()
+        self._enrollment_phrases: list[str] = enrollment_phrases()
+        self._active_enrollment_sample_id: str | None = None
+        self._enrollment_cancel = threading.Event()
+        self._last_from_voice = False
 
     def load_models(self) -> None:
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Silero VAD"})
@@ -80,9 +100,14 @@ class MarvinAgent:
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Qwen3 4B Instruct"})
         self._llm = ProviderLLM(load_local=True)
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Kokoro-82M TTS"})
-        self._tts = KokoroTTS()
+        try:
+            self.reload_tts()
+        except Exception:
+            self._tts = KokoroTTS()
+            logger.exception("Speech-settings TTS load failed; using default Kokoro voice")
         self._emit(AgentStatus.PROCESSING, {"step": "Loading speaker verification"})
         self._speaker = SpeakerVerifier()
+        self._sync_voice_settings_with_profile()
         try:
             from backend.skills import get_skill_file_service
 
@@ -93,8 +118,26 @@ class MarvinAgent:
         from backend.tools.obsidian import warm_note_cache
 
         warm_note_cache()
-        ready_data: dict = {"ready": True, "voice_enrolled": self._speaker.is_enrolled}
+        ready_data: dict = {
+            "ready": True,
+            "voice_enrolled": self._speaker.is_enrolled,
+            "voice_settings": self.voice_listening_status(),
+        }
         self._emit(AgentStatus.IDLE, ready_data)
+
+    def reload_tts(self) -> None:
+        """Hot-reload Kokoro after Output Speech settings change."""
+        from backend.config import KOKORO_VOICE_MAP
+        from backend.speech_settings import load_speech_settings
+
+        settings = load_speech_settings()
+        voice, lang = KOKORO_VOICE_MAP.get(
+            (settings.nationality, settings.gender),
+            ("bm_george", "b"),
+        )
+        with self._audio_lock:
+            self._tts = KokoroTTS(voice=voice, lang=lang)
+            logger.info("TTS reloaded voice=%s lang=%s", voice, lang)
 
     @property
     def is_ready(self) -> bool:
@@ -104,15 +147,95 @@ class MarvinAgent:
     def voice_enrolled(self) -> bool:
         return bool(self._speaker and self._speaker.is_enrolled)
 
-    def voice_profile_status(self) -> dict:
-        if not self._speaker:
-            return {"enrolled": False, "pending": 0, "required": 3, "lock_enabled": SPEAKER_LOCK_ENABLED}
+    def _sync_voice_settings_with_profile(self) -> None:
+        settings = load_voice_settings()
+        enrolled = bool(self._speaker and self._speaker.is_enrolled)
+        if enrolled:
+            if settings.voice_profile_status in {"not_configured", "error"}:
+                settings.voice_profile_status = (
+                    "enabled" if settings.voice_lock_enabled else "disabled"
+                )
+            if self._speaker and self._speaker.model_version:
+                settings.verifier_model_version = self._speaker.model_version
+        else:
+            settings.voice_profile_status = "not_configured"
+            if settings.voice_lock_enabled:
+                settings.voice_profile_status = "needs_reenrollment"
+        self._voice_settings = save_voice_settings(settings)
+
+    def voice_listening_settings(self) -> VoiceListeningSettings:
+        return self._voice_settings
+
+    def update_voice_listening_settings(self, **changes) -> dict:
+        settings = update_voice_settings(**changes)
+        self._voice_settings = settings
+        self._sync_voice_settings_with_profile()
+        return self.voice_listening_status()
+
+    def voice_listening_status(self) -> dict:
+        settings = self.voice_listening_settings()
+        enrolled = bool(self._speaker and self._speaker.is_enrolled)
+        if settings.voice_lock_enabled and not enrolled:
+            status = "needs_reenrollment"
+        elif enrolled and settings.voice_lock_enabled:
+            status = "enabled"
+        elif enrolled:
+            status = "disabled"
+        else:
+            status = "not_configured"
+        samples: list[dict] = []
+        if self._speaker:
+            samples = self._speaker.ensure_enrollment_slots(self._enrollment_phrases)
         return {
-            "enrolled": self._speaker.is_enrolled,
-            "pending": self._speaker.pending_count,
-            "required": self._speaker.required_samples,
-            "lock_enabled": SPEAKER_LOCK_ENABLED,
+            "enrolled": enrolled,
+            "pending": self._speaker.pending_count if self._speaker else 0,
+            "required": self._speaker.required_samples if self._speaker else 6,
+            "lock_enabled": settings.voice_lock_enabled,
+            "voice_lock_enabled": settings.voice_lock_enabled,
+            "voice_profile_status": status,
+            "strictness_mode": settings.strictness_mode,
+            "require_addressing": settings.require_addressing,
+            "contextual_continuation_enabled": settings.contextual_continuation_enabled,
+            "continuation_window_seconds": settings.continuation_window_seconds,
+            "profile_name": settings.profile_name,
+            "enrollment_completed_at": settings.enrollment_completed_at,
+            "verifier_model_version": settings.verifier_model_version,
+            "phrases": list(self._enrollment_phrases),
+            "samples": samples,
+            "active_enrollment_sample_id": self._active_enrollment_sample_id,
+            "sample_seconds": SPEAKER_ENROLL_SECONDS,
+            "natural_sample_seconds": SPEAKER_NATURAL_ENROLL_SECONDS,
+            "natural_prompt": ENROLL_NATURAL_PROMPT,
+            "instructions": (
+                "Stop Voice first. Use the microphone normally used with Marvin. "
+                "Sit at a normal speaking distance in a quiet room. Speak naturally — "
+                "do not whisper or shout. Avoid TV, music, or other voices. Read each "
+                "fixed sentence completely, then pause before the next recording. The "
+                "natural-speech exercise is free speech in your own words — do not read "
+                "that instruction aloud."
+            ),
+            "limitation": (
+                "Voice Lock verifies live microphone similarity to your enrolled "
+                "profile. Replay or spoofed audio is not fully prevented."
+            ),
         }
+
+    def voice_profile_status(self) -> dict:
+        return self.voice_listening_status()
+
+    def notify_broadcast(self, event: str, data: dict) -> None:
+        try:
+            self.on_broadcast(event, data)
+        except Exception:
+            logger.debug("Broadcast %s failed", event, exc_info=True)
+
+    def set_client_timezone(self, timezone_id: str | None) -> None:
+        value = (timezone_id or "").strip() or None
+        self._clock.update_session_timezone(client_timezone=value)
+        self._client_timezone = self._clock.session_timezone
+
+    def _set_sticky_tools(self, names: list[str]) -> None:
+        self._mark_tools_used(*names)
 
     def _tool_activity_payload(self) -> dict:
         with self._tool_lock:
@@ -450,6 +573,241 @@ class MarvinAgent:
 
         return "chat", "fast"
 
+    def _execute_any_tool(self, name: str, args: dict, user_message: str) -> str:
+        if name == "web_search":
+            from backend.tools.web_search import dispatch_web_search_tool
+
+            return dispatch_web_search_tool(name, args, user_message)
+        if name.startswith("spotify"):
+            from backend.tools.spotify import dispatch_spotify_tool, unwrap_spotify_tool_text
+            from backend.tools.spotify.types import SpotifyError
+
+            try:
+                result = dispatch_spotify_tool(name, args, user_message)
+            except SpotifyError as exc:
+                from backend.tools.spotify import user_facing_error as spotify_user_facing_error
+
+                return (
+                    f'<spotify_data untrusted="true">\n'
+                    f"{spotify_user_facing_error(exc)}\n"
+                    f"</spotify_data>"
+                )
+            unwrap_spotify_tool_text(result)
+            return result
+        if name == "run_python":
+            from backend.tools.python_runner import dispatch_python_tool
+
+            return dispatch_python_tool(name, args, user_message)
+        if name.startswith("timer_"):
+            from backend.tools.timers import dispatch_timer_tool
+
+            return dispatch_timer_tool(name, args, user_message)
+        if name == "switch_model":
+            from backend.tools.ai_model import dispatch_switch_model
+
+            result = dispatch_switch_model(name, args, user_message)
+            try:
+                from backend.provider_service import providers_status
+
+                self.notify_broadcast("model_changed", providers_status())
+            except Exception:
+                logger.debug("model_changed broadcast failed", exc_info=True)
+            return result
+        if name.startswith("scrambler_"):
+            from backend.tools.voice_scrambler import dispatch_scrambler_tool
+
+            return dispatch_scrambler_tool(name, args, user_message)
+        from backend.tools.obsidian import dispatch_tool as dispatch_obsidian_tool
+
+        return dispatch_obsidian_tool(name, args, user_message)
+
+    def _process_side_effect_tools(self, text: str, prompt: str) -> str:
+        assert self._llm
+        from backend.tools.spotify import (
+            SpotifyDecision,
+            decide_spotify,
+            register_spotify_capability,
+            tools_for_spotify,
+        )
+        from backend.tools.python_runner import (
+            decide_python,
+            register_python_capability,
+            tools_for_python,
+        )
+        from backend.tools.timers import (
+            decide_timer,
+            register_timer_capability,
+            tools_for_timers,
+        )
+        from backend.tools.ai_model import (
+            decide_switch_model,
+            tools_for_switch_model,
+        )
+        from backend.tools.voice_scrambler import (
+            decide_scrambler,
+            handle_direct_scrambler,
+            tools_for_scrambler,
+        )
+        from backend.tools.web_search import (
+            SearchDecision,
+            decide_web_search,
+            register_web_search_capability,
+            run_planned_search,
+            tools_for_web_search,
+            wrap_search_results,
+        )
+        from backend.tools.web_search.types import WebSearchError
+        from backend.tools.multi_tool import (
+            collect_required_families,
+            compose_prompt_blurb,
+            compose_tools,
+            prefixes_for_families,
+            primary_family,
+        )
+
+        web_available = register_web_search_capability()
+        spotify_available = register_spotify_capability()
+        python_available = register_python_capability()
+        timer_available = register_timer_capability()
+        search_decision, search_reason = decide_web_search(
+            text, available=web_available, vault_required=False
+        )
+        spotify_decision, _spotify_reason = decide_spotify(
+            text, available=spotify_available
+        )
+        python_needed = decide_python(text, available=python_available)
+        timer_needed = decide_timer(text, available=timer_available)
+        switch_needed = decide_switch_model(text, available=True)
+        scrambler_needed = decide_scrambler(text, available=True)
+        logger.info(
+            "DEV: search=%s spotify=%s python=%s timer=%s switch=%s scrambler=%s",
+            search_decision.value,
+            spotify_decision.value,
+            python_needed,
+            timer_needed,
+            switch_needed,
+            scrambler_needed,
+        )
+
+        sticky: list[str] = []
+        if search_decision.value in {"required", "allowed"} and web_available:
+            sticky.append("web_search")
+        if spotify_decision == SpotifyDecision.REQUIRED and spotify_available:
+            sticky.append("spotify")
+        if scrambler_needed:
+            sticky.append("voice_scrambler")
+        if timer_needed and timer_available:
+            sticky.append("timers")
+        if switch_needed:
+            sticky.append("ai_model")
+        if python_needed and python_available:
+            sticky.append("python_runner")
+        if sticky:
+            self._set_sticky_tools(sticky)
+
+        execute = self._tracked_tool_executor(self._execute_any_tool)
+        runtime_block = self._clock.create_turn_context(turn_id="chat").to_prompt_block()
+        prompt = f"{prompt}\n\n{runtime_block}"
+
+        if spotify_decision == SpotifyDecision.UNAVAILABLE:
+            from backend.tools.spotify import spotify_status
+
+            status = spotify_status()
+            if not status.client_configured:
+                return (
+                    "Spotify isn’t configured. Set SPOTIFY_CLIENT_ID and restart Marvin."
+                )
+            return "Spotify isn’t connected. Open Settings to connect."
+
+        if search_decision == SearchDecision.UNAVAILABLE:
+            return (
+                "Web Search is not configured, so I could not check current sources."
+            )
+
+        required_families = collect_required_families(
+            spotify_required=(
+                spotify_decision == SpotifyDecision.REQUIRED and spotify_available
+            ),
+            scrambler_needed=scrambler_needed,
+            timer_needed=timer_needed and timer_available,
+            switch_needed=switch_needed,
+            python_needed=python_needed and python_available,
+        )
+        if required_families:
+            pre_satisfied: list[str] = []
+            direct_scrambler_reply = None
+            if "scrambler" in required_families:
+                direct_scrambler_reply = handle_direct_scrambler(text)
+                if direct_scrambler_reply:
+                    self._mark_tools_used("voice_scrambler")
+                    pre_satisfied.append("scrambler")
+            remaining = [f for f in required_families if f not in pre_satisfied]
+            if remaining:
+                composed = compose_tools(
+                    remaining,
+                    providers={
+                        "spotify": tools_for_spotify,
+                        "scrambler": tools_for_scrambler,
+                        "timers": tools_for_timers,
+                        "ai_model": tools_for_switch_model,
+                        "python_runner": tools_for_python,
+                    },
+                )
+                extra = compose_prompt_blurb(remaining)
+                if direct_scrambler_reply:
+                    extra += (
+                        f" Voice scrambler already ran: {direct_scrambler_reply} "
+                        "Do not call scrambler tools again."
+                    )
+                reply = self._llm.chat_with_tools(
+                    text,
+                    f"{prompt} {extra} {_TOOL_EVIDENCE_RULE}",
+                    composed,
+                    execute,
+                    force_tool_use=True,
+                    required_tool_prefixes=prefixes_for_families(remaining),
+                    pre_satisfied_families=pre_satisfied,
+                )
+            else:
+                reply = direct_scrambler_reply or "Done."
+                self._llm.remember_exchange(text, reply)
+            return reply
+
+        if search_decision == SearchDecision.REQUIRED and web_available:
+            try:
+                search_response = run_planned_search(
+                    text,
+                    turn_id="chat",
+                    generation_id="chat",
+                )
+            except WebSearchError as exc:
+                from backend.tools.web_search import user_facing_error
+
+                reply = user_facing_error(exc)
+                self._llm.remember_exchange(text, reply)
+                return reply
+            self._mark_tools_used("web_search")
+            return self._llm.chat_with_context(
+                text,
+                prompt
+                + " Ground factual claims in the provided web evidence and cite "
+                "source IDs like [S1]. Prefer concise spoken answers.",
+                wrap_search_results(search_response),
+            )
+
+        if search_decision == SearchDecision.ALLOWED and web_available:
+            return self._llm.chat_with_tools(
+                text,
+                prompt
+                + " A web-search tool is available, but do not use it unless you "
+                "cannot answer from stable knowledge.",
+                tools_for_web_search(),
+                execute,
+                force_tool_use=False,
+            )
+
+        return self._llm.chat(text, prompt)
+
     def process_text(self, text: str) -> str:
         """Handle typed or transcribed user input."""
         if not self.is_ready:
@@ -489,6 +847,56 @@ class MarvinAgent:
             else:
                 reply = saved_skill
             reply_entry = append_message("assistant", reply, self.active_function)
+            self.on_message(reply_entry)
+            logger.info("MARVIN: %s", reply)
+            return reply
+
+        lower_text = text.lower()
+        if any(
+            marker in lower_text
+            for marker in (
+                "voice lock",
+                "voice profile",
+                "enroll my voice",
+                "recognize my voice",
+                "speaker verification",
+            )
+        ):
+            reply = (
+                "Voice Lock is configured in Settings under Voice and Listening. "
+                "Open Settings, then Voice Lock, to enroll or change it."
+            )
+            reply_entry = append_message("assistant", reply, self.active_function)
+            self.on_message(reply_entry)
+            if self._llm:
+                self._llm.remember_exchange(text, reply)
+            logger.info("MARVIN: %s", reply)
+            return reply
+
+        from backend.reminders import handle_reminder_utterance
+
+        reminder_reply = handle_reminder_utterance(text)
+        if reminder_reply:
+            self._mark_tools_used("timers")
+            if self._llm:
+                self._llm.remember_exchange(text, reminder_reply)
+            reply_entry = append_message("assistant", reminder_reply, "daily_planning")
+            self.on_message(reply_entry)
+            logger.info("MARVIN: %s", reminder_reply)
+            return reminder_reply
+
+        clock_kind = match_deterministic_datetime_query(text)
+        if clock_kind is not None:
+            ctx = self._clock.create_turn_context(turn_id="typed")
+            if clock_kind == "date":
+                reply = self._clock.answer_date(ctx)
+            elif clock_kind == "time":
+                reply = self._clock.answer_time(ctx, refresh=True)
+            else:
+                reply = self._clock.answer_date_time(ctx, refresh=True)
+            if self._llm:
+                self._llm.remember_exchange(text, reply)
+            reply_entry = append_message("assistant", reply, "chat")
             self.on_message(reply_entry)
             logger.info("MARVIN: %s", reply)
             return reply
@@ -576,7 +984,7 @@ class MarvinAgent:
                     # Capability questions do not need a filesystem tool call.
                     reply = self._llm.chat(text, prompt)
             else:
-                reply = self._llm.chat(text, prompt)
+                reply = self._process_side_effect_tools(text, prompt)
             logger.info(
                 "LATENCY: Qwen route+response %.2fs",
                 time.perf_counter() - generation_started,
@@ -597,9 +1005,34 @@ class MarvinAgent:
         logger.info("MARVIN: %s", reply)
         return reply
 
-    def speak(self, text: str) -> None:
-        """Synthesize and play TTS audio."""
+    def process_and_speak(
+        self,
+        text: str,
+        *,
+        client_timezone: str | None = None,
+        from_voice: bool = False,
+    ) -> str:
+        if client_timezone:
+            self.set_client_timezone(client_timezone)
+        self._last_from_voice = from_voice
+        reply = self.process_text(text)
+        self.speak(reply, from_voice=from_voice)
+        return reply
+
+    def speak(self, text: str, *, from_voice: bool | None = None) -> None:
+        """Synthesize and play TTS audio, honoring Output Speech mode."""
         if not self._tts:
+            return
+        spoken_from_voice = self._last_from_voice if from_voice is None else from_voice
+        try:
+            from backend.speech_settings import load_speech_settings
+
+            mode = load_speech_settings().mode
+        except Exception:
+            mode = "always_on"
+        if mode == "always_off":
+            return
+        if mode == "voice_input_only" and not spoken_from_voice:
             return
         self._emit(AgentStatus.SPEAKING, {"text": text[:80]})
         tts_started = time.perf_counter()
@@ -625,12 +1058,15 @@ class MarvinAgent:
         assert self._stt and self._llm and self._tts and self._speaker
         utterance_started = time.perf_counter()
 
-        if SPEAKER_LOCK_ENABLED and self._speaker.is_enrolled:
+        settings = self._voice_settings
+        lock_on = bool(settings.voice_lock_enabled) if settings else SPEAKER_LOCK_ENABLED
+        if lock_on and self._speaker.is_enrolled:
             speaker_started = time.perf_counter()
             verify_samples = int(VAD_SAMPLE_RATE * SPEAKER_VERIFY_SECONDS)
             accepted, score = self._speaker.is_owner(
                 audio[:verify_samples],
                 VAD_SAMPLE_RATE,
+                strictness_mode=settings.strictness_mode if settings else "strict",
             )
             logger.info(
                 "LATENCY: speaker verification %.2fs",
@@ -658,7 +1094,7 @@ class MarvinAgent:
             self._emit_idle_or_listening()
             return ""
         reply = self.process_text(text)
-        self.speak(reply)
+        self.speak(reply, from_voice=True)
         logger.info(
             "LATENCY: full voice turn %.2fs",
             time.perf_counter() - utterance_started,
@@ -695,16 +1131,41 @@ class MarvinAgent:
         finally:
             self._utterance_lock.release()
 
-    def record_enrollment_sample(self, seconds: float | None = None) -> dict:
+    def record_enrollment_sample(
+        self,
+        seconds: float | None = None,
+        sample_id: str | None = None,
+    ) -> dict:
         """Record one enrollment clip from the microphone."""
         if not self._speaker:
             raise RuntimeError("Speaker model not loaded")
         if self._listening:
             raise RuntimeError("Stop Voice before enrolling")
 
-        duration = seconds if seconds is not None else SPEAKER_ENROLL_SECONDS
+        self._speaker.ensure_enrollment_slots(self._enrollment_phrases)
+        target_id = sample_id or self._speaker.next_recordable_sample_id()
+        if not target_id:
+            raise RuntimeError("All enrollment samples are already accepted")
+        sample = self._speaker.get_sample(target_id)
+        if sample is None:
+            raise KeyError(f"Unknown enrollment sample: {target_id}")
+        phrase = sample["prompt_text"]
+        is_natural = sample.get("prompt_type") == "natural"
+        if seconds is not None:
+            duration = seconds
+        elif is_natural:
+            duration = SPEAKER_NATURAL_ENROLL_SECONDS
+        else:
+            duration = SPEAKER_ENROLL_SECONDS
+        min_seconds = 6.0 if is_natural else 2.0
         frames = int(VAD_SAMPLE_RATE * duration)
-        self._emit(AgentStatus.LISTENING, {"enrolling": True, "seconds": duration})
+        self._enrollment_cancel.clear()
+        self._active_enrollment_sample_id = target_id
+        self._speaker.set_sample_status(target_id, "recording")
+        self._emit(
+            AgentStatus.LISTENING,
+            {"enrolling": True, "seconds": duration, "sample_id": target_id},
+        )
         try:
             with self._audio_lock:
                 play_listening_on()
@@ -713,26 +1174,106 @@ class MarvinAgent:
             with self._audio_lock:
                 play_listening_off()
             mono = audio[:, 0] if audio.ndim > 1 else audio
-            result = self._speaker.add_enrollment_sample(mono, VAD_SAMPLE_RATE)
+            result = self._speaker.add_enrollment_sample(
+                mono,
+                VAD_SAMPLE_RATE,
+                min_seconds=min_seconds,
+                sample_id=target_id,
+            )
+        except Exception:
+            self._speaker.set_sample_status(target_id, "needs_retry", "Recording failed")
+            raise
         finally:
+            self._active_enrollment_sample_id = None
             self._emit(AgentStatus.IDLE, {"enrolling": False})
+        result["phrases"] = list(self._enrollment_phrases)
+        result["phrase"] = phrase
+        result.update(self.voice_listening_status())
         return result
 
     def finalize_voice_enrollment(self) -> dict:
         if not self._speaker:
             raise RuntimeError("Speaker model not loaded")
         result = self._speaker.finalize_enrollment()
-        self._emit(AgentStatus.IDLE, {"voice_enrolled": True})
-        return result
+        update_voice_settings(
+            voice_lock_enabled=True,
+            voice_profile_status="enabled",
+            enrollment_completed_at=result.get("completed_at", ""),
+            verifier_model_version=result.get("model_version", ""),
+        )
+        self._sync_voice_settings_with_profile()
+        self._enrollment_phrases = enrollment_phrases()
+        self._emit(
+            AgentStatus.IDLE,
+            {"voice_enrolled": True, "voice_settings": self.voice_listening_status()},
+        )
+        return {**result, **self.voice_listening_status()}
 
     def clear_voice_profile(self) -> None:
         if self._speaker:
             self._speaker.clear_profile()
-            self._emit(AgentStatus.IDLE, {"voice_enrolled": False})
+            update_voice_settings(
+                voice_lock_enabled=False,
+                voice_profile_status="not_configured",
+                enrollment_completed_at="",
+            )
+            self._sync_voice_settings_with_profile()
+            self._enrollment_phrases = enrollment_phrases()
+            self._emit(
+                AgentStatus.IDLE,
+                {
+                    "voice_enrolled": False,
+                    "voice_settings": self.voice_listening_status(),
+                },
+            )
 
-    def reset_enrollment(self) -> None:
+    def reset_enrollment(self) -> dict:
+        self._enrollment_cancel.set()
         if self._speaker:
             self._speaker.reset_enrollment()
+        self._enrollment_phrases = enrollment_phrases()
+        if self._speaker:
+            self._speaker.ensure_enrollment_slots(self._enrollment_phrases)
+        self._active_enrollment_sample_id = None
+        return self.voice_listening_status()
+
+    def reset_enrollment_sample(self, sample_id: str) -> dict:
+        if not self._speaker:
+            raise RuntimeError("Speaker model not loaded")
+        self._speaker.ensure_enrollment_slots(self._enrollment_phrases)
+        result = self._speaker.reset_enrollment_sample(sample_id)
+        status = self.voice_listening_status()
+        status.update(result)
+        return status
+
+    def test_voice_sample(self, seconds: float | None = None) -> dict:
+        """Record a short clip and score it against the enrolled profile."""
+        if not self._speaker:
+            raise RuntimeError("Speaker model not loaded")
+        if not self._speaker.is_enrolled:
+            raise RuntimeError("Enroll a voice profile before testing")
+        if self._listening:
+            raise RuntimeError("Stop Voice before testing enrollment")
+        duration = seconds if seconds is not None else 3.0
+        frames = int(VAD_SAMPLE_RATE * duration)
+        self._emit(AgentStatus.LISTENING, {"testing": True, "seconds": duration})
+        try:
+            with self._audio_lock:
+                play_listening_on()
+            audio = sd.rec(frames, samplerate=VAD_SAMPLE_RATE, channels=1, dtype="float32")
+            sd.wait()
+            with self._audio_lock:
+                play_listening_off()
+            mono = audio[:, 0] if audio.ndim > 1 else audio
+            settings = self.voice_listening_settings()
+            result = self._speaker.test_sample(
+                mono,
+                VAD_SAMPLE_RATE,
+                strictness_mode=settings.strictness_mode,
+            )
+        finally:
+            self._emit(AgentStatus.IDLE, {"testing": False})
+        return result
 
     def start_listening(self) -> bool:
         """Begin microphone capture and report whether the stream opened."""

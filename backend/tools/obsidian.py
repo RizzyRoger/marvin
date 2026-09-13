@@ -88,6 +88,62 @@ class VaultAccessError(PermissionError):
     """Raised when a path is blocked or unauthorized."""
 
 
+def vault_is_connected() -> bool:
+    """True when the configured vault root exists and is readable."""
+    return bool(vault_access_state().get("connected"))
+
+
+def vault_access_state() -> dict:
+    """Diagnose vault connectivity for Settings and first-run setup."""
+    state = {
+        "connected": False,
+        "configured": False,
+        "exists": False,
+        "readable": False,
+        "needs_permission": False,
+        "path": "",
+        "hint": "",
+    }
+    try:
+        if not str(VAULT_ROOT):
+            state["hint"] = "Choose an Obsidian vault folder in Settings."
+            return state
+        root = VAULT_ROOT.resolve()
+        if root == Path().resolve() and not VAULT_ROOT.parts:
+            state["hint"] = "Choose an Obsidian vault folder in Settings."
+            return state
+        state["configured"] = True
+        state["path"] = str(root)
+        exists = root.is_dir()
+        state["exists"] = exists
+        if not exists:
+            state["hint"] = "That vault path does not exist on disk."
+            return state
+        readable = os.access(root, os.R_OK)
+        state["readable"] = readable
+        if not readable:
+            state["needs_permission"] = True
+            state["hint"] = (
+                "macOS is blocking Marvin from reading Documents. "
+                "Grant Files and Folders access, then reopen the vault."
+            )
+            return state
+        try:
+            next(root.iterdir(), None)
+        except PermissionError:
+            state["needs_permission"] = True
+            state["hint"] = (
+                "macOS is blocking Marvin from reading this vault. "
+                "Grant Files and Folders access, then reopen the vault."
+            )
+            return state
+        state["connected"] = True
+        return state
+    except OSError:
+        state["hint"] = "Could not inspect the vault path."
+        return state
+
+
 def _relative(path: Path) -> Path:
     """Return a stable vault-relative path after resolving macOS aliases."""
     return path.resolve().relative_to(VAULT_ROOT.resolve())
