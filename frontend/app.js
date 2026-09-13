@@ -280,7 +280,7 @@ els.messageInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 els.voiceBtn.addEventListener("click", toggleVoice);
-els.clearBtn.addEventListener("click", async () => {
+els.clearBtn?.addEventListener("click", async () => {
   await fetch("/api/chat/history", { method: "DELETE" });
   clearChatUI();
 });
@@ -347,3 +347,155 @@ setInterval(async () => {
     }
   } catch (_) {}
 }, 3000);
+
+/* --- Settings dialog + Skills (bundled Agent Skills) --- */
+const settingsEls = {
+  settingsBtn: document.getElementById("settings-btn"),
+  settingsDialog: document.getElementById("settings-dialog"),
+  settingsCloseBtn: document.getElementById("settings-close-btn"),
+  settingsNavItems: document.querySelectorAll("[data-settings-category].settings-nav-item"),
+  settingsPanels: document.querySelectorAll(".settings-panel"),
+  skillsStatusLine: document.getElementById("skills-status-line"),
+  skillsPathLine: document.getElementById("skills-path-line"),
+  skillsRevealBtn: document.getElementById("skills-reveal-btn"),
+  skillsRefreshBtn: document.getElementById("skills-refresh-btn"),
+  formatSkillsList: document.getElementById("format-skills-list"),
+  formatSkillsPhase2: document.getElementById("format-skills-phase2-hint"),
+};
+
+let settingsCategory =
+  localStorage.getItem("marvin-settings-category") || "general";
+
+function setSettingsCategory(category) {
+  settingsCategory = category || "general";
+  localStorage.setItem("marvin-settings-category", settingsCategory);
+  settingsEls.settingsNavItems.forEach((button) => {
+    const selected = button.dataset.settingsCategory === settingsCategory;
+    button.setAttribute("aria-selected", String(selected));
+  });
+  settingsEls.settingsPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.settingsCategory !== settingsCategory;
+  });
+  if (settingsCategory === "skills") {
+    refreshSkillsStatus();
+  }
+}
+
+function setSettingsOpen(open) {
+  if (!settingsEls.settingsDialog || !settingsEls.settingsBtn) return;
+  settingsEls.settingsBtn.setAttribute("aria-expanded", String(open));
+  settingsEls.settingsBtn.classList.toggle("active", open);
+  if (open) {
+    setSettingsCategory(settingsCategory || "general");
+    if (typeof settingsEls.settingsDialog.showModal === "function") {
+      settingsEls.settingsDialog.showModal();
+    }
+  } else if (settingsEls.settingsDialog.open) {
+    settingsEls.settingsDialog.close();
+  }
+}
+
+function renderFormatSkills(formatSkills, phase2) {
+  if (!settingsEls.formatSkillsList) return;
+  settingsEls.formatSkillsList.innerHTML = "";
+  (formatSkills || []).forEach((skill) => {
+    const row = document.createElement("div");
+    row.className = "format-skill-row";
+    const label = document.createElement("label");
+    label.className = "format-skill-toggle";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = !!skill.enabled;
+    input.dataset.skillId = skill.id;
+    input.addEventListener("change", () => saveFormatSkillToggles());
+    const text = document.createElement("span");
+    const group = skill.group ? ` · ${skill.group}` : "";
+    text.innerHTML = `<strong>${skill.name || skill.id}</strong>${group}<br /><span class="hint">${
+      skill.description || ""
+    }</span>`;
+    label.appendChild(input);
+    label.appendChild(text);
+    row.appendChild(label);
+    if (skill.group === "custom" || skill.custom) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn btn-ghost format-skill-delete";
+      del.textContent = "Delete";
+      del.addEventListener("click", async (event) => {
+        event.preventDefault();
+        try {
+          await fetch(`/api/skills/custom/${encodeURIComponent(skill.id)}`, {
+            method: "DELETE",
+          });
+        } catch (_) {}
+        refreshSkillsStatus();
+      });
+      row.appendChild(del);
+    }
+    settingsEls.formatSkillsList.appendChild(row);
+  });
+  if (settingsEls.formatSkillsPhase2 && Array.isArray(phase2) && phase2.length) {
+    settingsEls.formatSkillsPhase2.textContent = `Phase 2 (not available yet): ${phase2.join(
+      ", "
+    )}.`;
+  }
+}
+
+async function refreshSkillsStatus() {
+  try {
+    const res = await fetch("/api/skills/status");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (settingsEls.skillsStatusLine) {
+      settingsEls.skillsStatusLine.textContent = data.configured
+        ? "Custom skill.md is active and loaded into Marvin’s prompt."
+        : "Placeholder only — edit skill.md to activate custom instructions.";
+    }
+    if (settingsEls.skillsPathLine) {
+      settingsEls.skillsPathLine.textContent = data.path || "";
+    }
+    renderFormatSkills(data.format_skills, data.phase2_skills);
+  } catch (_) {}
+}
+
+async function saveFormatSkillToggles() {
+  if (!settingsEls.formatSkillsList) return;
+  const enabled = {};
+  settingsEls.formatSkillsList
+    .querySelectorAll("input[type=checkbox][data-skill-id]")
+    .forEach((input) => {
+      enabled[input.dataset.skillId] = !!input.checked;
+    });
+  try {
+    const res = await fetch("/api/skills/format", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    renderFormatSkills(data.format_skills, data.phase2_skills);
+  } catch (_) {}
+}
+
+settingsEls.settingsBtn?.addEventListener("click", () => {
+  const open = settingsEls.settingsDialog && !settingsEls.settingsDialog.open;
+  setSettingsOpen(!!open);
+});
+settingsEls.settingsCloseBtn?.addEventListener("click", () => setSettingsOpen(false));
+settingsEls.settingsDialog?.addEventListener("cancel", (e) => {
+  e.preventDefault();
+  setSettingsOpen(false);
+});
+settingsEls.settingsNavItems.forEach((button) => {
+  button.addEventListener("click", () => {
+    setSettingsCategory(button.dataset.settingsCategory);
+  });
+});
+settingsEls.skillsRevealBtn?.addEventListener("click", async () => {
+  try {
+    await fetch("/api/skills/reveal", { method: "POST" });
+  } catch (_) {}
+});
+settingsEls.skillsRefreshBtn?.addEventListener("click", () => refreshSkillsStatus());
+setSettingsCategory(settingsCategory);

@@ -197,6 +197,115 @@ async def delete_voice_profile():
     return {"enrolled": False}
 
 
+@router.get("/api/skills/status")
+async def skills_status():
+    from backend.skills import (
+        PHASE2_SKILL_IDS,
+        discover_bundled_skills,
+        get_skill_file_service,
+        load_format_skill_settings,
+    )
+
+    service = get_skill_file_service()
+    service.ensure_exists()
+    status = service.get_status()
+    enabled = load_format_skill_settings()
+    format_skills = [
+        {
+            "id": skill.skill_id,
+            "name": skill.name,
+            "description": skill.description,
+            "enabled": bool(enabled.get(skill.skill_id, skill.group == "custom")),
+            "phase": skill.phase,
+            "group": skill.group,
+            "custom": skill.group == "custom",
+        }
+        for skill in discover_bundled_skills()
+    ]
+    status["format_skills"] = format_skills
+    status["bundled_skills"] = format_skills
+    status["phase2_skills"] = list(PHASE2_SKILL_IDS)
+    return status
+
+
+@router.post("/api/skills/reveal")
+async def skills_reveal():
+    """Open the skill.md folder in the system file browser."""
+    import subprocess
+    import sys
+
+    from backend.skills import get_skill_file_service
+
+    path = get_skill_file_service().ensure_exists()
+    folder = str(path.parent)
+    try:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", folder])
+        elif sys.platform.startswith("linux"):
+            subprocess.Popen(["xdg-open", folder])
+        else:
+            subprocess.Popen(["explorer", folder])
+    except Exception as exc:
+        raise HTTPException(500, f"Could not open skills folder: {exc}") from exc
+    return {"path": str(path), "opened": True}
+
+
+class FormatSkillsUpdate(BaseModel):
+    enabled: dict[str, bool]
+
+
+@router.put("/api/skills/format")
+async def skills_format_update(body: FormatSkillsUpdate):
+    from backend.skills import (
+        discover_bundled_skills,
+        save_format_skill_settings,
+    )
+
+    saved = save_format_skill_settings(body.enabled or {})
+    skills = [
+        {
+            "id": skill.skill_id,
+            "name": skill.name,
+            "description": skill.description,
+            "enabled": bool(saved.get(skill.skill_id, skill.group == "custom")),
+            "phase": skill.phase,
+            "group": skill.group,
+            "custom": skill.group == "custom",
+        }
+        for skill in discover_bundled_skills()
+    ]
+    return {
+        "enabled": saved,
+        "format_skills": skills,
+        "bundled_skills": skills,
+    }
+
+
+@router.delete("/api/skills/custom/{slug}")
+async def skills_custom_delete(slug: str):
+    from backend.skills.custom import delete_custom_skill
+
+    result = delete_custom_skill(slug)
+    if result.startswith("REFUSED:"):
+        raise HTTPException(404, result)
+    from backend.skills import discover_bundled_skills, load_format_skill_settings
+
+    enabled = load_format_skill_settings()
+    skills = [
+        {
+            "id": skill.skill_id,
+            "name": skill.name,
+            "description": skill.description,
+            "enabled": bool(enabled.get(skill.skill_id, skill.group == "custom")),
+            "phase": skill.phase,
+            "group": skill.group,
+            "custom": skill.group == "custom",
+        }
+        for skill in discover_bundled_skills()
+    ]
+    return {"ok": True, "result": result, "format_skills": skills, "bundled_skills": skills}
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()

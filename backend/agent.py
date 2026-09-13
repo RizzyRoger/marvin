@@ -77,6 +77,12 @@ class MarvinAgent:
         self._tts = KokoroTTS()
         self._emit(AgentStatus.PROCESSING, {"step": "Loading speaker verification"})
         self._speaker = SpeakerVerifier()
+        try:
+            from backend.skills import get_skill_file_service
+
+            get_skill_file_service().ensure_exists()
+        except Exception:
+            logger.exception("Could not ensure skill.md placeholder")
         # Move the first safe vault scan into startup instead of the first request.
         from backend.tools.obsidian import warm_note_cache
 
@@ -148,8 +154,45 @@ class MarvinAgent:
             return bool(tail)
         return False
 
+    def _enrich_prompt(
+        self,
+        prompt: str,
+        *,
+        routed_function: str | None = None,
+        user_text: str = "",
+    ) -> str:
+        """Append user skill.md and bundled Agent Skills when relevant."""
+        function_id = routed_function or self.active_function
+        enriched = prompt
+        try:
+            from backend.skills import get_skill_file_service
+
+            status = get_skill_file_service().get_status()
+            if status.get("configured"):
+                skill_text = get_skill_file_service().read().strip()
+                if skill_text:
+                    enriched = (
+                        f"{enriched}\n\nUser skill instructions (follow when relevant):\n"
+                        f"{skill_text}"
+                    )
+        except Exception:
+            logger.debug("SKILL: could not load skill.md", exc_info=True)
+        try:
+            from backend.skills import build_skills_prompt_section
+
+            section = build_skills_prompt_section(
+                routed_function=function_id,
+                user_text=user_text,
+            )
+            if section:
+                enriched = f"{enriched}\n\nBundled skills:\n{section}"
+        except Exception:
+            logger.debug("SKILL: could not load format skills", exc_info=True)
+        return enriched
+
     def _system_prompt(self) -> str:
-        return SYSTEM_PROMPTS.get(self.active_function, SYSTEM_PROMPTS["chat"])
+        base = SYSTEM_PROMPTS.get(self.active_function, SYSTEM_PROMPTS["chat"])
+        return self._enrich_prompt(base, routed_function=self.active_function)
 
     def _route_function(self, text: str) -> tuple[str, str]:
         """
@@ -188,9 +231,25 @@ class MarvinAgent:
             "update my",
             "create a note",
             "delete my",
+            "check off",
+            "check it off",
+            "mark complete",
+            "mark as done",
+            "mark as complete",
+            "complete the task",
         )
         if any(marker in lower for marker in obsidian_markers):
             return "obsidian", "fast"
+        try:
+            from backend.tools.obsidian import (
+                is_write_consent_only,
+                pending_write_message,
+            )
+
+            if is_write_consent_only(text) and pending_write_message():
+                return "obsidian", "consent"
+        except Exception:
+            logger.debug("ROUTER: write-consent check failed", exc_info=True)
 
         voice_markers = (
             "voice lock",
@@ -241,6 +300,9 @@ class MarvinAgent:
             raise RuntimeError("Models not loaded")
 
         logger.info("USER: %s", text)
+        from backend.tools.obsidian import remember_write_turn
+
+        remember_write_turn(text)
         switched = self.detect_function_switch(text)
         if switched and not self._has_request_after_switch(text, switched):
             label = next(f["label"] for f in FUNCTIONS if f["id"] == switched)
@@ -256,25 +318,65 @@ class MarvinAgent:
         self.on_message(user_entry)
         self._emit(AgentStatus.PROCESSING, {"step": "Thinking"})
 
+        from backend.skills.repeats import try_save_pending_skill
+
+        saved_skill = try_save_pending_skill(text)
+        if saved_skill:
+            if saved_skill.startswith("OK:"):
+                reply = saved_skill[4:].strip()
+                if reply and reply[0].islower():
+                    reply = reply[0].upper() + reply[1:]
+                if not reply.endswith("."):
+                    reply += "."
+            else:
+                reply = saved_skill
+            reply_entry = append_message("assistant", reply, self.active_function)
+            self.on_message(reply_entry)
+            logger.info("MARVIN: %s", reply)
+            return reply
+
         assert self._llm
         with self._llm_lock:
             generation_started = time.perf_counter()
             routed_function, route_method = self._route_function(text)
             self._last_routed_function = routed_function
             logger.info("ROUTER: %s (%s)", routed_function, route_method)
-            prompt = SYSTEM_PROMPTS.get(routed_function, self._system_prompt())
+            prompt = self._enrich_prompt(
+                SYSTEM_PROMPTS.get(routed_function, SYSTEM_PROMPTS["chat"]),
+                routed_function=routed_function,
+                user_text=text,
+            )
 
             if routed_function == "obsidian":
                 from backend.tools.obsidian import (
                     dispatch_tool,
+                    effective_write_message,
                     handle_direct_daily_note_create,
+                    is_write_consent_only,
+                    pending_write_message,
                     prefetch_read_request,
                     tools_for_request,
                     user_grants_write,
                 )
 
                 prompt += f" The current local date is {date.today().isoformat()}."
+
                 write_requested = user_grants_write(text)
+                if is_write_consent_only(text) and pending_write_message():
+                    prompt += (
+                        f" The user previously asked: {pending_write_message()}. "
+                        "They now authorize that write. Call complete_task with "
+                        "authorized=true and a query naming each item from that request."
+                    )
+                elif write_requested and (
+                    "check off" in effective_write_message(text).lower()
+                    or "authori" in text.lower()
+                ):
+                    prompt += (
+                        " If they asked to check off / mark done or authorized the write, "
+                        "call complete_task with authorized=true. Do not say you are "
+                        "not authorized."
+                    )
                 retrieval_started = time.perf_counter()
                 prefetched_context = prefetch_read_request(text)
                 logger.info(
@@ -314,6 +416,16 @@ class MarvinAgent:
             logger.info(
                 "LATENCY: Qwen route+response %.2fs",
                 time.perf_counter() - generation_started,
+            )
+
+        from backend.skills.repeats import maybe_propose_skill
+
+        draft = maybe_propose_skill(text)
+        if draft:
+            reply = (
+                f"{reply.rstrip()}\n\nYou've asked this a few times. "
+                f"I can save a custom skill “{draft['name']}”: {draft['description']} "
+                f"{draft['body']} Say yes or I authorise to save it."
             )
 
         reply_entry = append_message("assistant", reply, self.active_function)
