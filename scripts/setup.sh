@@ -42,9 +42,11 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# llama-cpp-python with Metal support on Apple Silicon
+# Apple Silicon: MLX for local Qwen; llama.cpp Metal remains the fallback.
 if [ "$(uname -m)" = "arm64" ]; then
-  echo "Installing llama-cpp-python with Metal (Apple Silicon)…"
+  echo "Installing mlx-lm (Apple Silicon Qwen)…"
+  pip install "mlx-lm>=0.26.0"
+  echo "Installing llama-cpp-python with Metal (fallback)…"
   CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
 fi
 

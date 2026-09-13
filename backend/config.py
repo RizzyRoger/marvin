@@ -19,8 +19,12 @@ WHISPER_BEAM_SIZE = 1  # greedy decoding is substantially faster for live conver
 # --- LLM (Qwen3 4B Instruct, Q4) ---
 LLM_REPO = "DhruvalLabs/Qwen3-4B-Instruct-2507-GGUF"
 LLM_FILENAME = "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+LLM_MLX_REPO = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+LLM_MLX_DIR = MODELS_DIR / "llm-mlx"
 LLM_N_CTX = 8192
 LLM_HISTORY_MESSAGES = 6  # three recent turns preserve continuity with less prompt work
+# Spoken replies stay short; keep generation bounded to reduce LLM+TTS latency.
+LLM_CHAT_MAX_TOKENS = 256
 # Metal + PyTorch together can crash llama.cpp on macOS; default to CPU there.
 # Override with MARVIN_LLM_GPU_LAYERS=-1 for full Metal offload if stable on your machine.
 _default_gpu_layers = 0 if platform.system() == "Darwin" else -1
@@ -77,6 +81,7 @@ FUNCTIONS = [
     {"id": "daily_planning", "label": "Daily Planning", "description": "Plan your day and tasks", "enabled": False},
     {"id": "web_search", "label": "Web Search", "description": "Search the internet", "enabled": False},
     {"id": "python_runner", "label": "Python Scripts", "description": "Run Python scripts", "enabled": False},
+    {"id": "ai_model", "label": "Model", "description": "Switch the active AI model", "enabled": True},
 ]
 
 _SHARED_STYLE = (
@@ -151,3 +156,21 @@ FUNCTION_VOICE_ALIASES = {
     "python_runner": ["python", "run script", "execute code"],
     "voice_lock": ["voice lock", "voice key", "authentication"],
 }
+
+
+def response_max_tokens(user_message: str, *, default: int | None = None) -> int:
+    """Heuristic token budget: bump only when the user asks for a long answer."""
+    import re
+
+    base = LLM_CHAT_MAX_TOKENS if default is None else default
+    lower = (user_message or "").lower()
+    if re.search(
+        r"\b("
+        r"in detail|explain in detail|long(?:er)?(?:\s+answer|\s+explanation)?|"
+        r"walk me through|thorough(?:ly)?|elaborate|comprehensive|deep dive|"
+        r"step by step|in depth|full(?:er)? explanation"
+        r")\b",
+        lower,
+    ):
+        return max(base, 550)
+    return base

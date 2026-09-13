@@ -65,6 +65,12 @@ def init_agent(marvin: MarvinAgent) -> None:
     marvin.on_message = on_message
 
 
+def _tool_activity(marvin: MarvinAgent | None) -> dict:
+    if not marvin:
+        return {"functions_used": [], "sticky_tools": [], "active_tools": []}
+    return marvin._tool_activity_payload()
+
+
 @router.get("/api/health")
 async def health():
     return {
@@ -73,6 +79,7 @@ async def health():
         "listening": agent._listening if agent else False,
         "active_function": agent.active_function if agent else "chat",
         "voice_enrolled": agent.voice_enrolled if agent else False,
+        **_tool_activity(agent),
     }
 
 
@@ -99,9 +106,11 @@ async def get_chat_history():
 @router.delete("/api/chat/history")
 async def delete_chat_history():
     clear_history()
-    if agent and agent._llm:
-        agent._llm.reset_history()
-    await broadcast("history_cleared", {})
+    if agent:
+        agent.clear_used_tools()
+        if agent._llm:
+            agent._llm.reset_history()
+    await broadcast("history_cleared", {"functions_used": [], "sticky_tools": [], "active_tools": []})
     return {"ok": True}
 
 
@@ -306,6 +315,71 @@ async def skills_custom_delete(slug: str):
     return {"ok": True, "result": result, "format_skills": skills, "bundled_skills": skills}
 
 
+class ProviderKeyBody(BaseModel):
+    api_key: str
+
+
+class ProviderTestBody(BaseModel):
+    api_key: str | None = None
+
+
+class ModelSelectBody(BaseModel):
+    provider_id: str
+    model_id: str
+
+
+@router.get("/api/providers")
+async def get_providers():
+    from backend.provider_service import providers_status
+
+    return providers_status()
+
+
+@router.put("/api/providers/{provider_id}/key")
+async def put_provider_key(provider_id: str, body: ProviderKeyBody):
+    from backend.provider_service import save_provider_key
+
+    try:
+        return save_provider_key(provider_id, body.api_key)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
+
+
+@router.delete("/api/providers/{provider_id}/key")
+async def remove_provider_key(provider_id: str):
+    from backend.provider_service import delete_provider_key
+
+    try:
+        return delete_provider_key(provider_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/api/providers/{provider_id}/test")
+async def test_provider(provider_id: str, body: ProviderTestBody | None = None):
+    from backend.provider_service import test_provider_key
+
+    payload = body or ProviderTestBody()
+    try:
+        return test_provider_key(provider_id, payload.api_key)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/api/providers/select")
+async def select_provider_model(body: ModelSelectBody):
+    from backend.provider_service import select_model
+
+    try:
+        result = select_model(body.provider_id, body.model_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    await broadcast("model_changed", result)
+    return result
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
@@ -318,6 +392,7 @@ async def websocket_endpoint(ws: WebSocket):
                 "active_function": agent.active_function if agent else "chat",
                 "functions": FUNCTIONS,
                 "voice_enrolled": agent.voice_enrolled if agent else False,
+                **_tool_activity(agent),
             },
         }))
         while True:

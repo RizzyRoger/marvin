@@ -5,6 +5,9 @@
     cfg.downloadUrl ||
     "https://github.com/RizzyRoger/marvin/archive/refs/heads/main.zip";
   var goatCode = (cfg.goatCounterCode || "").trim();
+  var demoUrl = typeof cfg.demoVideoUrl === "string" ? cfg.demoVideoUrl.trim() : "";
+  var demoPoster =
+    typeof cfg.demoPosterUrl === "string" ? cfg.demoPosterUrl.trim() : "";
 
   document.querySelectorAll('[data-role="payment"]').forEach(function (el) {
     if (payUrl) {
@@ -32,6 +35,31 @@
     if (l) {
       l.textContent =
         "Your payment went through. Grab the current build below.";
+    }
+  }
+
+  var demoWrap = document.getElementById("demo-wrap");
+  var demoVideo = document.getElementById("demo-video");
+  var demoFallback = document.getElementById("demo-fallback");
+  if (demoWrap) {
+    if (!demoUrl) {
+      demoWrap.hidden = true;
+    } else {
+      demoWrap.hidden = false;
+      if (demoVideo) {
+        demoVideo.setAttribute("src", demoUrl);
+        if (demoPoster) {
+          demoVideo.setAttribute("poster", demoPoster);
+        }
+        demoVideo.addEventListener("error", function () {
+          demoVideo.hidden = true;
+          if (demoFallback) demoFallback.hidden = false;
+        });
+        // Probe load; if file missing, browsers fire error on the media element.
+        try {
+          demoVideo.load();
+        } catch (_) {}
+      }
     }
   }
 

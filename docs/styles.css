@@ -71,9 +71,18 @@ body {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   padding: clamp(1.5rem, 4vw, 3.5rem);
   max-width: 52rem;
+}
+
+.hero {
+  justify-content: flex-start;
+  padding-top: clamp(2rem, 6vh, 4rem);
+  padding-bottom: clamp(2.5rem, 6vh, 4rem);
+}
+
+.page {
+  justify-content: center;
 }
 
 .brand {
@@ -174,7 +183,7 @@ body {
 }
 
 .lede {
-  margin: 0 0 2rem;
+  margin: 0 0 1.25rem;
   font-size: clamp(1.02rem, 2.1vw, 1.15rem);
   line-height: 1.5;
   color: var(--muted);
@@ -185,6 +194,25 @@ body {
 
 .page .lede {
   max-width: 44ch;
+}
+
+.examples {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  max-width: 36rem;
+  border-top: 1.5px solid var(--ink);
+  animation: board-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.examples li {
+  margin: 0;
+  padding: 0.65rem 0;
+  border-bottom: 1.5px solid var(--ink);
+  font-size: clamp(0.95rem, 2vw, 1.05rem);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
 }
 
 .signal-bar {
@@ -201,7 +229,7 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.75rem;
-  margin-bottom: 2.25rem;
+  margin-bottom: 1.75rem;
   animation: board-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
 }
 
@@ -307,8 +335,57 @@ body {
   font-size: 0.88rem;
   line-height: 1.5;
   color: var(--muted);
-  max-width: 40ch;
+  max-width: 42ch;
   animation: board-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.36s both;
+}
+
+.demo {
+  margin-top: 2rem;
+  max-width: 40rem;
+  animation: board-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+.demo[hidden] {
+  display: none;
+}
+
+.demo-label {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.demo-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: var(--ink);
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.demo-fallback {
+  margin: 0;
+  padding: 1.25rem 1rem;
+  border: 1.5px solid var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--muted);
+  background: var(--paper-deep);
+}
+
+.demo-fallback[hidden] {
+  display: none;
+}
+
+.demo-fallback code {
+  font-size: 0.85em;
+  color: var(--ink);
 }
 
 .back-link {
@@ -347,10 +424,12 @@ body {
   .directives,
   .headline,
   .lede,
+  .examples,
   .signal-bar,
   .cta,
   .choice-grid,
   .privacy,
+  .demo,
   .back-link {
     animation: none;
   }

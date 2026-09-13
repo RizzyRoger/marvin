@@ -1355,3 +1355,141 @@ html:not([data-theme="dark"]) .settings-btn.active {
   display: inline-block;
   margin-top: 0.15rem;
 }
+
+.life-ticker {
+  margin: 0;
+  padding: 0.35rem 1.5rem;
+  border-bottom: 4px solid var(--border);
+  font-family: var(--font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.brand-gpp {
+  display: none;
+  width: 48px;
+  height: 48px;
+  color: var(--ink);
+}
+
+.gpp-eye {
+  fill: currentColor;
+}
+
+.gpp-eye-dim {
+  opacity: 0.28;
+}
+
+.gpp-eye-led {
+  fill: var(--signal);
+}
+
+.composer-hatch {
+  align-self: center;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* --- Board directions (Paranoid Android / Signal Board) --- */
+
+html[data-direction] .brand-logo-img {
+  display: none;
+}
+
+html[data-direction] .brand-gpp {
+  display: block;
+}
+
+html[data-direction="gpp-head"] .brand-icon {
+  border: 2px solid var(--border);
+}
+
+html[data-direction="gpp-head"] .welcome h3 {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1.05;
+  max-width: 16ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+html[data-direction="chest-plate"] .sidebar {
+  background: #1a1812;
+  color: #e8d4a8;
+  --text: #e8d4a8;
+  --text-muted: #c4b48e;
+  --text-dim: #8a7d62;
+  --border: #e8d4a8;
+  --bg-sidebar: #1a1812;
+  --bg-main: #1a1812;
+  --function-active: #58f03a;
+  --function-active-text: #1a1812;
+  --ink: #e8d4a8;
+}
+
+html[data-direction="chest-plate"] .brand-gpp,
+html[data-direction="chest-plate"] .settings-btn {
+  color: #e8d4a8;
+  filter: none;
+}
+
+html[data-direction="chest-plate"] .status-pill {
+  background: #262218;
+  color: #e8d4a8;
+  border-color: #e8d4a8;
+}
+
+html[data-direction="chest-plate"] .function-item .fn-icon {
+  background: #1a1812;
+  color: #e8d4a8;
+  border-color: #e8d4a8;
+}
+
+html[data-direction="life-ticker"] .btn-primary:not(.listening) {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-direction="life-ticker"] .composer {
+  align-items: center;
+}
+
+html[data-direction="empty-planet"] {
+  --sidebar-width: 200px;
+}
+
+html[data-direction="empty-planet"] .brand {
+  margin-bottom: 3rem;
+}
+
+html[data-direction="empty-planet"] .functions-heading,
+html[data-direction="empty-planet"] .function-item .fn-desc {
+  opacity: 0.55;
+}
+
+html[data-direction="empty-planet"] .chat {
+  padding: 3rem 1.5rem;
+}
+
+html[data-direction="empty-planet"] .welcome {
+  max-width: 28ch;
+}
+
+html[data-direction="empty-planet"] .welcome h3 {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+html[data-direction="empty-planet"] .btn-primary {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+html[data-direction="empty-planet"] .composer {
+  padding: 0.55rem 1.5rem;
+}

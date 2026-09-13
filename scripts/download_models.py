@@ -11,6 +11,8 @@ sys.path.insert(0, str(ROOT))
 
 from backend.config import (  # noqa: E402
     LLM_FILENAME,
+    LLM_MLX_DIR,
+    LLM_MLX_REPO,
     LLM_REPO,
     MODELS_DIR,
     WHISPER_MODEL_ID,
@@ -44,6 +46,25 @@ def download_llm() -> None:
         local_dir_use_symlinks=False,
     )
     print("✓ Qwen3 4B Instruct downloaded")
+
+
+def download_llm_mlx() -> None:
+    import platform
+
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
+        print("Skipping MLX Qwen weights (not Darwin arm64)")
+        return
+
+    from huggingface_hub import snapshot_download
+
+    dest = LLM_MLX_DIR
+    dest.mkdir(parents=True, exist_ok=True)
+    print(f"Downloading MLX Qwen3 4B Instruct 4-bit → {dest}")
+    snapshot_download(
+        repo_id=LLM_MLX_REPO,
+        local_dir=str(dest),
+    )
+    print("✓ MLX Qwen3 4B Instruct downloaded")
 
 
 def download_silero_vad() -> None:
@@ -89,6 +110,7 @@ def main() -> None:
     print("  • Silero VAD")
     print("  • Whisper large-v3-turbo (int8)")
     print("  • Qwen3 4B Instruct Q4_K_M")
+    print("  • Qwen3 4B Instruct MLX 4-bit (Apple Silicon)")
     print("  • Kokoro-82M TTS")
     print("  • SpeechBrain ECAPA speaker encoder")
     print()
@@ -97,6 +119,7 @@ def main() -> None:
         ("Silero VAD", download_silero_vad),
         ("Whisper", download_whisper),
         ("Qwen3 4B", download_llm),
+        ("Qwen3 4B MLX", download_llm_mlx),
         ("Kokoro", download_kokoro),
         ("Speaker encoder", download_speaker),
     ]

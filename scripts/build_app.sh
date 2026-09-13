@@ -42,18 +42,38 @@ if [ -z "$PYTHON" ] || [ -z "$SITE_PACKAGES" ]; then
 fi
 
 # Launcher lives inside the .app bundle (Finder blocks scripts in Documents/Obsidian).
+# Same tree as ./scripts/run.sh: workspace Signal Board, not Contents/Resources/runtime.
 cat >"$RESOURCES/launch.sh" <<LAUNCHER
 #!/usr/bin/env bash
 set -euo pipefail
 PROJECT_ROOT="$ROOT"
 PYTHON="$PYTHON"
 SITE_PACKAGES="$SITE_PACKAGES"
-LOG_FILE="\$PROJECT_ROOT/data/marvin.log"
-mkdir -p "\$PROJECT_ROOT/data"
+SUPPORT="\${HOME}/Library/Application Support/Marvin"
+
+if [ ! -d "\$PROJECT_ROOT/backend" ]; then
+  osascript -e 'display alert "Marvin" message "Workspace backend is missing at '"$ROOT"'."' || true
+  exit 1
+fi
+
+if [ -d "\$SUPPORT/models/whisper-large-v3-turbo" ]; then
+  DATA_DIR="\$SUPPORT/data"
+  MODELS_DIR="\$SUPPORT/models"
+  export MARVIN_BUNDLE=1
+else
+  DATA_DIR="\$PROJECT_ROOT/data"
+  MODELS_DIR="\$PROJECT_ROOT/models"
+fi
+mkdir -p "\$DATA_DIR"
+LOG_FILE="\$DATA_DIR/marvin.log"
+
 cd "\$PROJECT_ROOT"
 export PYTHONUNBUFFERED=1
 export PYTHONPATH="\$PROJECT_ROOT:\$SITE_PACKAGES"
 export VIRTUAL_ENV="\$PROJECT_ROOT/.venv"
+export MARVIN_ROOT="\$PROJECT_ROOT"
+export MARVIN_DATA_DIR="\$DATA_DIR"
+export MARVIN_MODELS_DIR="\$MODELS_DIR"
 
 # Clear zombie server left behind after a crash.
 if lsof -ti:8765 >/dev/null 2>&1; then

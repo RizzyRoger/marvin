@@ -57,7 +57,7 @@ Open **Settings** for:
 | AI Providers | OpenAI / Anthropic / xAI keys (Keychain) + model picker |
 | Voice Lock | Enroll voice, strictness, addressing rules |
 | Spotify | Connect / disconnect Spotify (PKCE; tokens in Keychain) |
-| Skills | Status and folder for `skill.md` standing instructions |
+| Skills | Status and folder for `skill.md`; toggles for bundled skills (Obsidian formats + daily-tasks / web-search) |
 
 ## Privacy — what leaves the machine
 
@@ -72,6 +72,35 @@ Open **Settings** for:
 See [SECURITY.md](SECURITY.md) for the distribution threat model and wipe paths.
 
 Third-party license texts are collected in [`licenses/`](licenses/) and indexed in [Licenses.md](Licenses.md).
+
+## Bundled skills
+
+Toggle skills in **Settings → Skills**. A short catalog is always available; full skill bodies inject when a turn matches (Obsidian route, task/web triggers, etc.). Vault I/O still goes through Marvin’s native tools in `backend/tools/obsidian.py` — not the Obsidian CLI.
+
+### Obsidian format skills
+
+Vendored from [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (MIT) under [`resources/skills/obsidian/`](resources/skills/obsidian/):
+
+| Skill | Default | Role |
+|-------|---------|------|
+| `obsidian-markdown` | On | Wikilinks, callouts, properties, embeds |
+| `obsidian-bases` | Off | `.base` views / filters |
+| `json-canvas` | Off | `.canvas` files |
+
+### Marvin feature skills
+
+Authored under [`resources/skills/marvin/`](resources/skills/marvin/):
+
+| Skill | Default | Role |
+|-------|---------|------|
+| `daily-tasks` | On | Checkbox / TODO lines that task tools can parse |
+| `web-search` | On | Focused queries + brief `[S1]`-style citations for speech |
+
+Spotify, timers, scrambler, python runner, and spoken TTS style are **not** skills — they stay as tools / always-on prompt rules. See [`resources/skills/marvin/NOTICE.md`](resources/skills/marvin/NOTICE.md).
+
+### Phase 2 (not bundled)
+
+`obsidian-cli` and `defuddle` from upstream are intentionally **not** enabled. They need external binaries and would overlap existing vault / web tools. See [`resources/skills/obsidian/NOTICE.md`](resources/skills/obsidian/NOTICE.md).
 
 ## Website (marvin.sarl)
 

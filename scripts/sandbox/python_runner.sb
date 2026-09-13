@@ -1,0 +1,27 @@
+(version 1)
+(deny default)
+(import "system.sb")
+
+(allow process-exec)
+(allow process-fork)
+(allow process-info*)
+(allow signal)
+(allow sysctl-read)
+(allow mach-lookup)
+
+(allow file-read*
+  (subpath "/usr")
+  (subpath "/System")
+  (subpath "/Library")
+  (subpath "/opt")
+  (subpath "/private/var/db/dyld")
+  (literal "/private/etc")
+  (literal "/dev/null")
+  (literal "/dev/urandom")
+  (literal "/dev/zero")
+)
+(allow file-read-metadata)
+(allow file-write-data (literal "/dev/null"))
+
+; Concrete (allow file-read*/write*) rules for the scripts dir are appended by Marvin.
+(deny network*)

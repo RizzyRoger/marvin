@@ -6,7 +6,7 @@
     <title>Marvin, an AI agent that puts you in charge</title>
     <meta
       name="description"
-      content="Marvin is a local voice agent for Mac. Automates what should be automated—not what can be."
+      content="Marvin is a local Mac voice agent. Rename vault files, summarize documents, create reminders — $5 or free if you can’t afford it."
     />
     <link rel="icon" type="image/png" href="brand-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -23,8 +23,8 @@
     <!--
       THESIS: Clarity as personality — stacked enamel directives, not a soft AI hero.
       OWN-WORLD: Paper #e8d4a8, ink #1a1812, signal green #58f03a; Archivo Black + Archivo; square enamel edges; one green bar.
-      STORY: Visitor understands Marvin is a local Mac voice agent they control, then downloads.
-      FIRST VIEWPORT: Stacked MARVIN / LOCAL VOICE / YOU IN CHARGE; lede; green signal bar; Download CTA; privacy rule.
+      STORY: Visitor sees what Marvin does, honest pricing, local-vs-cloud privacy, then gets the app.
+      FIRST VIEWPORT: Brand · directives · concrete lede · three examples · Get Marvin CTA · privacy.
       FORM: Signal Board (Swiss industrial signage) · seed 77a4b2bd · model-pick · retro green/tan remap.
       FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
     -->
@@ -43,20 +43,46 @@
       </ul>
 
       <p class="lede">
-        A local voice agent for Mac. Automates what should be automated —
-        not what can be — so the decisions stay yours.
+        A Mac voice agent for your Obsidian vault and day: speak to rename notes,
+        summarize files, and set reminders — decisions stay yours.
       </p>
+
+      <ul class="examples" aria-label="What Marvin can do">
+        <li>Rename or find files in your Obsidian vault</li>
+        <li>Summarize a document you point it at</li>
+        <li>Create a reminder or timer by voice</li>
+      </ul>
 
       <div class="signal-bar" aria-hidden="true"></div>
 
       <div class="cta">
-        <a class="btn btn-primary" href="choose.html">Download now</a>
-        <p class="cta-note">Apple Silicon DMG · drag to Applications</p>
+        <a class="btn btn-primary" href="choose.html">Get Marvin</a>
+        <p class="cta-note">Apple Silicon · $5 or free if you can’t afford it</p>
       </div>
 
       <p class="privacy">
-        Local agent option — data never leaves your device. Choose privacy.
+        On-device by default — mic audio and vault notes stay on your Mac with local
+        models. If you pick a cloud model or web search, that turn’s text can leave
+        your Mac.
       </p>
+
+      <div class="demo" id="demo-wrap" hidden>
+        <p class="demo-label">See Marvin</p>
+        <video
+          id="demo-video"
+          class="demo-video"
+          controls
+          playsinline
+          muted
+          loop
+          preload="metadata"
+        >
+          Your browser does not support video.
+        </video>
+        <p class="demo-fallback" id="demo-fallback" hidden>
+          Demo recording — drop <code>docs/demo.mp4</code> next to this page.
+        </p>
+      </div>
     </main>
   </body>
 </html>

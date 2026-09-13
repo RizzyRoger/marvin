@@ -23,7 +23,8 @@ from backend.config import (
     VAD_MIN_SILENCE_MS,
     VAD_SAMPLE_RATE,
 )
-from backend.pipeline import KokoroTTS, QwenLLM, SileroVAD, SpeakerVerifier, WhisperSTT
+from backend.pipeline import KokoroTTS, SileroVAD, SpeakerVerifier, WhisperSTT
+from backend.providers.session_llm import ProviderLLM
 from backend.pipeline.tones import play_listening_off, play_listening_on, play_rejected
 from backend.storage.chat import append_message, load_history
 
@@ -55,7 +56,7 @@ class MarvinAgent:
         self._last_routed_function = "chat"
         self._vad: SileroVAD | None = None
         self._stt: WhisperSTT | None = None
-        self._llm: QwenLLM | None = None
+        self._llm: ProviderLLM | None = None
         self._tts: KokoroTTS | None = None
         self._speaker: SpeakerVerifier | None = None
         self._listening = False
@@ -65,6 +66,11 @@ class MarvinAgent:
         self._llm_lock = threading.Lock()
         self._audio_lock = threading.Lock()
         self._state_lock = threading.Lock()
+        self._tool_lock = threading.Lock()
+        self._tool_serial = 0
+        self.used_functions: list[str] = []
+        self._sticky_tools: list[str] = []
+        self._active_tool_calls: dict[str, dict[str, int]] = {}
 
     def load_models(self) -> None:
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Silero VAD"})
@@ -72,7 +78,7 @@ class MarvinAgent:
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Whisper large-v3-turbo"})
         self._stt = WhisperSTT()
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Qwen3 4B Instruct"})
-        self._llm = QwenLLM()
+        self._llm = ProviderLLM(load_local=True)
         self._emit(AgentStatus.PROCESSING, {"step": "Loading Kokoro-82M TTS"})
         self._tts = KokoroTTS()
         self._emit(AgentStatus.PROCESSING, {"step": "Loading speaker verification"})
@@ -108,8 +114,111 @@ class MarvinAgent:
             "lock_enabled": SPEAKER_LOCK_ENABLED,
         }
 
+    def _tool_activity_payload(self) -> dict:
+        with self._tool_lock:
+            active_tools = sorted(
+                name for name, calls in self._active_tool_calls.items() if calls
+            )
+            used = list(self.used_functions)
+            sticky = list(self._sticky_tools)
+        return {
+            "active_tools": active_tools,
+            "functions_used": used,
+            "sticky_tools": sticky,
+        }
+
     def _emit(self, status: AgentStatus | str, data: dict | None = None) -> None:
-        self.on_status(str(status), data or {})
+        payload = {**(data or {}), **self._tool_activity_payload()}
+        self.on_status(str(status), payload)
+
+    def clear_used_tools(self) -> None:
+        """Empty the turn-scoped sidebar list (new prompt or clear history)."""
+        with self._tool_lock:
+            self._active_tool_calls = {}
+            self._sticky_tools = []
+            self.used_functions = []
+
+    def _mark_tools_used(self, *tool_ids: str) -> None:
+        """Light sidebar rows for this turn. Chat never appears."""
+        with self._tool_lock:
+            ordered = list(self._sticky_tools)
+            for raw in tool_ids:
+                name = self._normalize_tool_activity_name(raw)
+                if name and name != "chat" and name not in ordered:
+                    ordered.append(name)
+            self._sticky_tools = ordered
+            self.used_functions = list(ordered)
+
+    def begin_tool(self, request_id: int, tool_name: str) -> str:
+        activity_name = self._normalize_tool_activity_name(tool_name)
+        with self._tool_lock:
+            self._tool_serial += 1
+            call_id = f"{activity_name}-{self._tool_serial}"
+            bucket = self._active_tool_calls.setdefault(activity_name, {})
+            bucket[call_id] = request_id
+        if activity_name and activity_name != "chat":
+            self._mark_tools_used(activity_name)
+        label = {
+            "obsidian": "Using Obsidian",
+            "web_search": "Using Web Search",
+            "spotify": "Using Spotify",
+            "timers": "Using Timers",
+            "ai_model": "Switching Model",
+            "voice_scrambler": "Voice Scrambler",
+            "python_runner": "Running Python",
+        }.get(activity_name, f"Using {activity_name}")
+        self._emit(
+            AgentStatus.PROCESSING,
+            {
+                "step": label,
+                "tool": tool_name,
+                "tool_activity": activity_name,
+                "tool_phase": "running",
+                "tool_call_id": call_id,
+                "request_id": request_id,
+            },
+        )
+        return call_id
+
+    def finish_tool(
+        self,
+        call_id: str,
+        request_id: int,
+        *,
+        status: str = "succeeded",
+    ) -> None:
+        with self._tool_lock:
+            activity_name = None
+            for name, bucket in self._active_tool_calls.items():
+                if call_id in bucket and bucket[call_id] == request_id:
+                    activity_name = name
+                    del bucket[call_id]
+                    break
+        if activity_name is None:
+            return
+        self._emit(
+            AgentStatus.PROCESSING,
+            {
+                "step": "Thinking",
+                "tool_activity": activity_name,
+                "tool_phase": status,
+                "tool_call_id": call_id,
+                "request_id": request_id,
+            },
+        )
+
+    def _tracked_tool_executor(self, execute_tool):
+        def wrapped(name, arguments, user_message=""):
+            call_id = self.begin_tool(0, name)
+            try:
+                result = execute_tool(name, arguments, user_message)
+            except Exception:
+                self.finish_tool(call_id, 0, status="failed")
+                raise
+            self.finish_tool(call_id, 0, status="succeeded")
+            return result
+
+        return wrapped
 
     def set_function(self, function_id: str) -> bool:
         enabled_ids = {f["id"] for f in FUNCTIONS if f["enabled"]}
@@ -119,6 +228,53 @@ class MarvinAgent:
         self._last_routed_function = function_id
         self._emit(AgentStatus.IDLE, {"function": function_id})
         return True
+
+    def _normalize_tool_activity_name(self, tool_name: str) -> str:
+        name = (tool_name or "").strip().lower()
+        if name.startswith("obsidian.") or name in {
+            "list_vault",
+            "find_note",
+            "read_best_note",
+            "find_daily_note",
+            "find_incomplete_tasks",
+            "complete_task",
+            "read_note",
+            "search_notes",
+            "edit_note",
+            "create_note",
+            "create_daily_note",
+            "delete_note",
+            "prefetch_read_request",
+        }:
+            return "obsidian"
+        if name.startswith("web_search") or name in {"web_search", "web-search"}:
+            return "web_search"
+        if name.startswith("spotify") or name in {
+            "spotify_now_playing",
+            "spotify_playback",
+            "spotify_search_play",
+        }:
+            return "spotify"
+        if name.startswith("run_python") or name in {"run_python", "python_runner"}:
+            return "python_runner"
+        if name.startswith("timer_") or name in {
+            "timer_start",
+            "timer_cancel",
+            "timer_adjust",
+            "timer_pause",
+            "timers",
+        }:
+            return "timers"
+        if name == "switch_model" or name in {"ai_model", "model"}:
+            return "ai_model"
+        if name.startswith("scrambler_") or name in {
+            "scrambler_start",
+            "scrambler_stop",
+            "scrambler_status",
+            "voice_scrambler",
+        }:
+            return "voice_scrambler"
+        return name or "obsidian"
 
     def detect_function_switch(self, text: str) -> str | None:
         """Check if user wants to switch function via voice."""
@@ -302,6 +458,8 @@ class MarvinAgent:
         logger.info("USER: %s", text)
         from backend.tools.obsidian import remember_write_turn
 
+        self.clear_used_tools()
+        self._emit(AgentStatus.PROCESSING, {"step": "Thinking"})
         remember_write_turn(text)
         switched = self.detect_function_switch(text)
         if switched and not self._has_request_after_switch(text, switched):
@@ -338,6 +496,8 @@ class MarvinAgent:
         assert self._llm
         with self._llm_lock:
             generation_started = time.perf_counter()
+            if hasattr(self._llm, "begin_turn"):
+                self._llm.begin_turn()
             routed_function, route_method = self._route_function(text)
             self._last_routed_function = routed_function
             logger.info("ROUTER: %s (%s)", routed_function, route_method)
@@ -388,11 +548,15 @@ class MarvinAgent:
                 if direct_write_reply is not None:
                     # Relative dates and canonical daily-note paths are deterministic;
                     # bypassing generation also prevents unrelated history leaking in.
+                    self._mark_tools_used("obsidian")
+                    self._emit(AgentStatus.PROCESSING, {"step": "Using Obsidian"})
                     reply = direct_write_reply
                     self._llm.remember_exchange(text, reply)
                 elif prefetched_context is not None:
                     # Common reads need one retrieval plus one answer generation,
                     # rather than a model planning round followed by a final round.
+                    self._mark_tools_used("obsidian")
+                    self._emit(AgentStatus.PROCESSING, {"step": "Using Obsidian"})
                     reply = self._llm.chat_with_context(
                         text,
                         prompt,
@@ -405,7 +569,7 @@ class MarvinAgent:
                         + " You MUST call the relevant vault tool before answering. "
                         "Never claim you cannot access notes when tools are available.",
                         tools_for_request(text),
-                        dispatch_tool,
+                        self._tracked_tool_executor(dispatch_tool),
                         requires_successful_write=True,
                     )
                 else:

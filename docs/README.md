@@ -23,6 +23,17 @@ python3 -m http.server 8080
 
 Open http://127.0.0.1:8080
 
+## Demo video (landing page)
+
+The home page can show a short screen recording under the privacy line.
+
+1. Export a muted loop (~20–40 seconds, H.264 in an `.mp4` container works best).
+2. Save it as [`docs/demo.mp4`](demo.mp4) (same folder as `index.html`).
+3. Optional still: set `demoPosterUrl` in [`config.js`](config.js) (e.g. `"demo-poster.jpg"`).
+4. To hide the demo block until you have a file, set `demoVideoUrl: ""` in `config.js`.
+
+If `demo.mp4` is missing while `demoVideoUrl` is set, the page shows a quiet “drop docs/demo.mp4” plate instead of a broken player.
+
 ## DNS
 
 See [DNS.md](DNS.md) for the exact Namecheap records.

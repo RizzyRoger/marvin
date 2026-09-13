@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import json
 import logging
+import platform
 import re
 import time
+from pathlib import Path
 from typing import Any, Callable
-
-from llama_cpp import Llama
 
 from backend.config import (
     LLM_FILENAME,
     LLM_HISTORY_MESSAGES,
+    LLM_MLX_DIR,
     LLM_N_CTX,
     LLM_N_GPU_LAYERS,
     MODELS_DIR,
@@ -36,10 +37,50 @@ _EMOJI_RE = re.compile(
 )
 
 
+def mlx_weights_ready(path: Path | None = None) -> bool:
+    """True when a local MLX snapshot looks loadable offline."""
+    dest = path or LLM_MLX_DIR
+    if not dest.is_dir():
+        return False
+    return (dest / "config.json").exists() or any(dest.glob("*.safetensors"))
+
+
+def should_use_mlx() -> bool:
+    """Prefer MLX on Apple Silicon when mlx-lm and weights are present."""
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
+        return False
+    try:
+        import mlx_lm  # noqa: F401
+    except ImportError:
+        return False
+    return mlx_weights_ready()
+
+
 class QwenLLM:
-    """Local Qwen3-4B-Instruct via llama.cpp (Q4_K_M GGUF)."""
+    """Local Qwen3-4B-Instruct via MLX on Apple Silicon, else llama.cpp GGUF."""
 
     def __init__(self):
+        self._backend = "none"
+        self._model = None
+        self._mlx_model = None
+        self._mlx_tokenizer = None
+        self._history: list[dict[str, Any]] = []
+        self.last_metrics: dict[str, float | int] = {}
+
+        if should_use_mlx():
+            try:
+                from mlx_lm import load
+
+                logger.info("Loading Qwen3 4B via MLX from %s", LLM_MLX_DIR)
+                self._mlx_model, self._mlx_tokenizer = load(str(LLM_MLX_DIR))
+                self._backend = "mlx"
+                logger.info("LLM backend: mlx")
+                return
+            except Exception:
+                logger.exception("MLX load failed; falling back to llama.cpp")
+
+        from llama_cpp import Llama
+
         model_path = MODELS_DIR / "llm" / LLM_FILENAME
         if not model_path.exists():
             raise FileNotFoundError(
@@ -52,8 +93,8 @@ class QwenLLM:
             n_gpu_layers=LLM_N_GPU_LAYERS,
             verbose=False,
         )
-        self._history: list[dict[str, Any]] = []
-        self.last_metrics: dict[str, float | int] = {}
+        self._backend = "llama.cpp"
+        logger.info("LLM backend: llama.cpp")
 
     def reset_history(self) -> None:
         self._history.clear()
@@ -100,6 +141,115 @@ class QwenLLM:
         )
         return prompt_tokens, output_tokens, elapsed
 
+    def _count_tokens(self, text: str) -> int:
+        tokenizer = self._mlx_tokenizer
+        if tokenizer is not None and hasattr(tokenizer, "encode"):
+            try:
+                encoded = tokenizer.encode(text)
+                return len(encoded)
+            except Exception:
+                pass
+        return max(1, len(text) // 4)
+
+    def _mlx_prompt(self, messages: list[dict[str, Any]], tools: Any = None) -> str:
+        tokenizer = self._mlx_tokenizer
+        if tokenizer is None:
+            raise RuntimeError("MLX tokenizer is not loaded")
+        kwargs: dict[str, Any] = {
+            "add_generation_prompt": True,
+        }
+        if hasattr(tokenizer, "apply_chat_template"):
+            try:
+                if tools:
+                    return tokenizer.apply_chat_template(
+                        messages, tools=tools, tokenize=False, **kwargs
+                    )
+                return tokenizer.apply_chat_template(
+                    messages, tokenize=False, **kwargs
+                )
+            except TypeError:
+                try:
+                    return tokenizer.apply_chat_template(messages, **kwargs)
+                except TypeError:
+                    return tokenizer.apply_chat_template(messages)
+        parts: list[str] = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content") or ""
+            parts.append(f"{role}: {content}")
+        parts.append("assistant:")
+        return "\n".join(parts)
+
+    def _mlx_generate(
+        self,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        top_p: float,
+    ) -> str:
+        from mlx_lm import generate
+
+        try:
+            from mlx_lm.sample_utils import make_sampler
+
+            sampler = make_sampler(temp=temperature, top_p=top_p)
+            return generate(
+                self._mlx_model,
+                self._mlx_tokenizer,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                sampler=sampler,
+                verbose=False,
+            )
+        except TypeError:
+            return generate(
+                self._mlx_model,
+                self._mlx_tokenizer,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temp=temperature,
+                verbose=False,
+            )
+
+    def _mlx_complete(self, **kwargs: Any) -> dict[str, Any]:
+        messages = kwargs.get("messages") or []
+        tools = kwargs.get("tools")
+        max_tokens = int(kwargs.get("max_tokens") or 256)
+        temperature = float(kwargs.get("temperature") if kwargs.get("temperature") is not None else 0.7)
+        top_p = float(kwargs.get("top_p") if kwargs.get("top_p") is not None else 0.9)
+        prompt = self._mlx_prompt(messages, tools=tools)
+        text = self._mlx_generate(
+            prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+        )
+        if not isinstance(text, str):
+            text = str(text or "")
+        prompt_tokens = self._count_tokens(prompt)
+        output_tokens = self._count_tokens(text)
+        return {
+            "choices": [{"message": {"content": text}}],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": output_tokens,
+            },
+        }
+
+    def _complete(self, **kwargs: Any) -> dict[str, Any]:
+        """Route one chat completion through FakeModel, llama.cpp, or MLX."""
+        custom = self.__dict__.get("_create_chat_completion")
+        if callable(custom):
+            return custom(**kwargs)
+        model = getattr(self, "_model", None)
+        if model is not None and hasattr(model, "create_chat_completion"):
+            return model.create_chat_completion(**kwargs)
+        if getattr(self, "_backend", None) == "mlx" and getattr(self, "_mlx_model", None) is not None:
+            return self._mlx_complete(**kwargs)
+        raise RuntimeError("No local LLM backend is loaded")
+
+    _create_chat_completion = _complete
+
     @staticmethod
     def _finalize_reply(reply: str) -> str:
         """Remove common unsolicited follow-up questions from spoken replies."""
@@ -119,7 +269,7 @@ class QwenLLM:
             "Otherwise use chat. Do not answer the request."
         )
         started = time.perf_counter()
-        response = self._model.create_chat_completion(
+        response = self._complete(
             messages=[
                 {"role": "system", "content": routing_prompt},
                 {"role": "user", "content": user_message},
@@ -187,7 +337,7 @@ class QwenLLM:
         messages.append({"role": "user", "content": user_message})
 
         started = time.perf_counter()
-        response = self._model.create_chat_completion(
+        response = self._complete(
             messages=messages,
             temperature=0.7,
             top_p=0.9,
@@ -241,7 +391,7 @@ class QwenLLM:
         )
 
         started = time.perf_counter()
-        response = self._model.create_chat_completion(
+        response = self._complete(
             messages=messages,
             temperature=0.5,
             top_p=0.9,
@@ -272,8 +422,17 @@ class QwenLLM:
         execute_tool: ToolExecutor,
         max_rounds: int = 4,
         requires_successful_write: bool = False,
+        force_tool_use: bool = False,
+        required_tool_prefixes: list[str] | None = None,
+        **_unused: Any,
     ) -> str:
         """Chat loop that can call tools then return a final text reply."""
+        from backend.tools.multi_tool import (
+            families_satisfied,
+            family_for_tool_name,
+            tool_result_is_success,
+        )
+
         request_started = time.perf_counter()
         messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         # History for tool chats: keep text-only prior turns to avoid huge contexts
@@ -290,13 +449,26 @@ class QwenLLM:
         final_reply = ""
         used_tool = False
         successful_write = False
+        successful_side_effects = False
+        hit_families: set[str] = set()
+        required_families = {
+            family
+            for prefix in (required_tool_prefixes or [])
+            if (family := family_for_tool_name(prefix)) is not None
+        }
         model_calls = 0
         tool_call_count = 0
         prompt_tokens_total = 0
         output_tokens_total = 0
+
+        def _families_done() -> bool:
+            if required_families:
+                return families_satisfied(required_families, hit_families)
+            return used_tool if force_tool_use else True
+
         for round_index in range(max_rounds):
             call_started = time.perf_counter()
-            response = self._model.create_chat_completion(
+            response = self._complete(
                 messages=messages,
                 tools=tools,
                 tool_choice="auto",
@@ -342,6 +514,9 @@ class QwenLLM:
                         args = {}
                     logger.info("Tool call: %s %s", name, args)
                     result = execute_tool(name, args, user_message)
+                    family = family_for_tool_name(name)
+                    if family:
+                        hit_families.add(family)
                     if (
                         name
                         in {
@@ -350,9 +525,13 @@ class QwenLLM:
                             "create_daily_note",
                             "delete_note",
                         }
+                        and isinstance(result, str)
                         and result.startswith("OK:")
                     ):
                         successful_write = True
+                        successful_side_effects = True
+                    elif isinstance(result, str) and tool_result_is_success(name, result):
+                        successful_side_effects = True
                     messages.append(
                         {
                             "role": "tool",
@@ -360,6 +539,21 @@ class QwenLLM:
                             "content": result,
                         }
                     )
+                continue
+
+            if force_tool_use and not _families_done():
+                missing = (
+                    sorted(required_families - hit_families) if required_families else []
+                )
+                nudge = (
+                    "Do not answer yet. Call the remaining required tools now "
+                    f"({', '.join(missing) if missing else 'available tools'}), "
+                    "inspect their results, and then answer."
+                )
+                messages.append(
+                    {"role": "assistant", "content": message.get("content") or ""}
+                )
+                messages.append({"role": "user", "content": nudge})
                 continue
 
             if not used_tool and round_index == 0:
@@ -392,12 +586,26 @@ class QwenLLM:
 
         self._history.append({"role": "user", "content": user_message})
         self._history.append({"role": "assistant", "content": final_reply})
+        if hit_families:
+            successful_side_effects = successful_side_effects or bool(
+                hit_families
+                & {
+                    "spotify",
+                    "scrambler",
+                    "timers",
+                    "ai_model",
+                    "python_runner",
+                }
+            )
         self.last_metrics = {
             "model_calls": model_calls,
             "tool_calls": tool_call_count,
             "prompt_tokens": prompt_tokens_total,
             "output_tokens": output_tokens_total,
             "total_seconds": time.perf_counter() - request_started,
+            "successful_write": successful_write,
+            "successful_side_effects": successful_side_effects,
+            "hit_families": sorted(hit_families),
         }
         logger.info("PERF: obsidian_request %s", self.last_metrics)
         return final_reply

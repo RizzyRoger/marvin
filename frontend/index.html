@@ -8,7 +8,7 @@
     THESIS: Signal Board operate shell — transcript first, green signal only for live voice.
     OWN-WORLD: Tan paper / warm ink / bright green signal · Archivo · square enamel · thick sidebar rule.
     STORY: User talks or types; status band names Listening / Thinking / Speaking.
-    FIRST VIEWPORT: Sidebar brand + functions · main transcript · green Start Voice.
+    FIRST VIEWPORT: Sidebar brand + functions used · main transcript · green Start Voice.
     FORM: Signal Board · seed 77a4b2bd · model-pick · retro green/tan remap.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
   -->
@@ -21,6 +21,12 @@
           : matchMedia("(prefers-color-scheme: dark)").matches
             ? "dark"
             : "light";
+      const direction = localStorage.getItem("marvin-direction");
+      if (direction && direction !== "gpp-head") {
+        document.documentElement.dataset.direction = direction;
+      } else {
+        delete document.documentElement.dataset.direction;
+      }
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -34,9 +40,17 @@
 <body>
   <div class="app">
     <aside class="sidebar">
+      <p class="life-ticker" id="life-ticker" hidden>Don't talk to me about life</p>
       <div class="brand">
         <div class="brand-icon">
-          <img src="/brand-logo.png" alt="Marvin logo" />
+          <img class="brand-logo-img" src="/brand-logo.png" alt="Marvin logo" />
+          <svg class="brand-gpp" viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="45" height="45" fill="none" stroke="currentColor" stroke-width="2" />
+            <rect x="9" y="11" width="30" height="26" fill="none" stroke="currentColor" stroke-width="2" />
+            <rect class="gpp-eye gpp-eye-dim" x="14" y="19" width="6" height="6" />
+            <rect class="gpp-eye gpp-eye-led" x="28" y="19" width="6" height="6" />
+            <rect x="18" y="31" width="12" height="3" fill="currentColor" />
+          </svg>
         </div>
         <div>
           <h1>Marvin</h1>
@@ -44,7 +58,7 @@
         </div>
       </div>
 
-      <p class="functions-heading">Functions used</p>
+      <p class="functions-heading" id="functions-heading">Functions used</p>
       <div class="functions" id="functions-list"></div>
 
       <div class="sidebar-footer">
@@ -67,7 +81,6 @@
           </button>
         </div>
       </div>
-
     </aside>
 
     <main class="main">
@@ -83,13 +96,14 @@
 
       <section class="chat" id="chat-messages">
         <div class="welcome">
-          <h3>Hello, I'm Marvin.</h3>
-          <p>Press <strong>Start Voice</strong> and speak, or type a message below.</p>
-          <p class="hint">Configure Voice Lock in Settings → Voice Lock.</p>
+          <h3 id="welcome-title">Hello, I'm Marvin.</h3>
+          <p id="welcome-body">Press <strong>Start Voice</strong> and speak, or type a message below.</p>
+          <p class="hint" id="welcome-hint">Configure Voice Lock in Settings → Voice Lock.</p>
         </div>
       </section>
 
       <footer class="composer">
+        <span class="composer-hatch" id="composer-hatch" hidden>Transmit</span>
         <textarea
           id="message-input"
           placeholder="Type a message…"
@@ -211,6 +225,13 @@
                 <button class="theme-option" data-theme-value="light" type="button">Light</button>
                 <button class="theme-option" data-theme-value="system" type="button">System</button>
                 <button class="theme-option" data-theme-value="dark" type="button">Dark</button>
+              </div>
+              <p class="settings-card-desc" style="margin-top: 1.1rem;">Board direction</p>
+              <div class="theme-options" role="group" aria-label="Board direction">
+                <button class="theme-option" data-direction-value="gpp-head" type="button">GPP head</button>
+                <button class="theme-option" data-direction-value="chest-plate" type="button">Chest plate</button>
+                <button class="theme-option" data-direction-value="life-ticker" type="button">Life ticker</button>
+                <button class="theme-option" data-direction-value="empty-planet" type="button">Empty planet</button>
               </div>
               <label class="voice-lock-field" style="margin-top: 1rem; display: block;">
                 <span class="setting-label">UI scale</span>
